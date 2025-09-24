@@ -1,5 +1,3 @@
-# jwst_data_pipeline.py 
-
 import os 
 import pickle 
 import gzip 
