@@ -3,40 +3,32 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from torch import optim, nn
+from torch.nn import functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from sklearn.metrics import roc_auc_score, confusion_matrix, f1_score, precision_score, recall_score
 from tqdm import tqdm
 import json
 import logging
 import sys
-import optuna
+import random
 
-from data_utils_hybrid_vae_jwst_newest import create_prediction_dataloaders
+from data_utils_hybrid_vae_jwst import create_prediction_dataloaders
 
-# --- MODEL: CNN + Bidirectional LSTM + Attention ---
+# --- MODEL: Upgraded Attention Architecture ---
 class Attention(nn.Module):
     def __init__(self, hidden_dim):
         super(Attention, self).__init__()
-        self.attn = nn.Linear(hidden_dim * 4, hidden_dim)
-        self.v = nn.Parameter(torch.rand(hidden_dim))
-        stdv = 1. / np.sqrt(self.v.size(0))
-        self.v.data.normal_(mean=0.0, std=stdv)
+        self.attention_net = nn.Sequential(
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 1)
+        )
 
-    def forward(self, hidden, encoder_outputs):
-        seq_len = encoder_outputs.size(1)
-        batch_size = encoder_outputs.size(0) # --- ⬇️ FIX: Get the dynamic batch size
-        hidden_repeated = hidden.unsqueeze(1).repeat(1, seq_len, 1)
-        
-        energy = torch.tanh(self.attn(torch.cat((hidden_repeated, encoder_outputs), dim=2)))
-        energy = energy.transpose(1, 2)
-        
-        # --- ⬇️ FIX: Repeat the 'v' vector for every item in the batch ⬇️ ---
-        v_view = self.v.unsqueeze(0).repeat(batch_size, 1).unsqueeze(1)
-        
-        attn_weights = torch.bmm(v_view, energy).squeeze(1)
-        soft_attn_weights = nn.functional.softmax(attn_weights, dim=1)
-        
-        context = torch.bmm(encoder_outputs.transpose(1, 2), soft_attn_weights.unsqueeze(2)).squeeze(2)
-        return context
+    def forward(self, lstm_output):
+        attention_scores = self.attention_net(lstm_output).squeeze(2)
+        attention_weights = F.softmax(attention_scores, dim=1)
+        context_vector = torch.bmm(lstm_output.transpose(1, 2), attention_weights.unsqueeze(2)).squeeze(2)
+        return context_vector
 
 class Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers, dropout_rate):
@@ -45,18 +37,14 @@ class Encoder(nn.Module):
             nn.Conv1d(input_dim, 64, kernel_size=7, padding=3), nn.ReLU()
         )
         self.lstm = nn.LSTM(64, hidden_dim, num_layers, batch_first=True,
-                            dropout=dropout_rate if num_layers > 1 else 0, 
-                            bidirectional=True)
+                            dropout=dropout_rate if num_layers > 1 else 0, bidirectional=True)
         self.attention = Attention(hidden_dim)
-
     def forward(self, x):
         x = x.permute(0, 2, 1)
         x = self.cnn(x)
         x = x.permute(0, 2, 1)
-        lstm_out, (hidden, _) = self.lstm(x)
-        
-        hidden_final = torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim=1)
-        context_vector = self.attention(hidden_final, lstm_out)
+        lstm_out, _ = self.lstm(x)
+        context_vector = self.attention(lstm_out)
         return context_vector
 
 class Decoder(nn.Module):
@@ -75,34 +63,52 @@ class PredictionModel(nn.Module):
         super(PredictionModel, self).__init__()
         self.encoder = Encoder(input_dim, hidden_dim, num_layers, dropout_rate)
         self.decoder = Decoder(hidden_dim, output_dim)
+        self.classification_head = nn.Sequential(
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+
     def forward(self, x):
         encoded_state = self.encoder(x)
-        predicted_target = self.decoder(encoded_state)
-        return predicted_target
+        reconstruction = self.decoder(encoded_state)
+        classification_logits = self.classification_head(encoded_state)
+        return reconstruction, classification_logits.squeeze(1)
 
-# --- 1. CONFIGURATION ---
-DEBUG_MODE = False
-PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData/jwst_vae_work")
-DATA_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData/processed_diffusion_style/low_band/data_files")
-OUTPUT_DIR = PROJECT_DIR / "processed_data"
-MANIFEST_PATH = Path("/home/nzhou/updated_dsn_project/JWSTData/processed_diffusion_style/low_band/manifest.json")
-MODEL_SAVE_PATH = PROJECT_DIR / "best_prediction_model.pth"
-LOG_SAVE_PATH = PROJECT_DIR / "training_log_prediction.csv"
-TRAIN_LOG_FILE = PROJECT_DIR / "training_console.log"
-NUM_TARGET_FEATURES = 10 
+# --- CONFIGURATION ---
+DATASET_TO_USE = "low_band"
+PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData")
+BASE_INPUT_DIR = PROJECT_DIR / "processed_diffusion_style"
+BASE_OUTPUT_DIR = PROJECT_DIR / "jwst_vae_work"
+INPUT_DATASET_DIR = BASE_INPUT_DIR / DATASET_TO_USE
+OUTPUT_SUBDIR = BASE_OUTPUT_DIR / DATASET_TO_USE
+OUTPUT_SUBDIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = INPUT_DATASET_DIR / "data_files"
+MANIFEST_PATH = INPUT_DATASET_DIR / "manifest.json"
+MODEL_SAVE_PATH = OUTPUT_SUBDIR / f"best_prediction_model_{DATASET_TO_USE}.pth"
+TRAIN_LOG_FILE = OUTPUT_SUBDIR / f"training_console_{DATASET_TO_USE}.log"
+NUM_TARGET_FEATURES = 10
+PSEUDO_LABELS_DIR = OUTPUT_SUBDIR / "pseudo_labels_per_track"
+
+# --- Hyperparameters ---
+LEARNING_RATE = 0.0001
 BATCH_SIZE = 128
+HIDDEN_DIM = 128
+NUM_LAYERS = 4
+WINDOW_SIZE = 200
+DROPOUT_RATE = 0.5
+WEIGHT_DECAY = 1e-5
 EPOCHS = 50
-WINDOW_SIZE = 100
 EARLY_STOPPING_PATIENCE = 10
+LAMBDA_CLASSIFICATION = 1.0
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-N_TRIALS = 20
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.FileHandler(TRAIN_LOG_FILE, mode='w'), logging.StreamHandler(sys.stdout)])
-logging.info(f"Using device: {DEVICE}")
-if DEBUG_MODE: logging.info("\n!!! DEBUG MODE IS ACTIVE !!!\n")
+logging.basicConfig(level=logging.INFO,
+                      format='%(asctime)s - %(levelname)s - %(message)s',
+                      handlers=[logging.FileHandler(TRAIN_LOG_FILE, mode='w'),
+                                logging.StreamHandler(sys.stdout)])
 
 def get_target_columns(manifest_path, data_dir, num_targets):
-    logging.info("Identifying target columns from training data...")
     with open(manifest_path, 'r') as f: manifest = json.load(f)
     train_files = [data_dir / item['track_features'] for item in manifest['train']]
     df_list = [pd.read_parquet(f) for f in train_files[:50]]
@@ -114,120 +120,85 @@ def get_target_columns(manifest_path, data_dir, num_targets):
     target_columns = variances.tail(num_targets).index.tolist()
     all_columns = full_df.columns.tolist()
     input_columns = [col for col in all_columns if col not in target_columns]
-    logging.info(f"Selected {len(target_columns)} target columns: {target_columns}")
     return input_columns, target_columns
 
-def objective(trial, input_dim, output_dim, train_loader, val_loader):
-    params = {
-        'LEARNING_RATE': trial.suggest_float("lr", 1e-4, 1e-2, log=True),
-        'HIDDEN_DIM': trial.suggest_categorical("hidden_dim", [32, 64, 128]),
-        'NUM_LAYERS': trial.suggest_int("num_layers", 1, 3),
-        'DROPOUT_RATE': trial.suggest_float("dropout", 0.1, 0.5),
-        'WEIGHT_DECAY': trial.suggest_float("weight_decay", 1e-6, 1e-4, log=True)
-    }
-    model_hyperparams = {'input_dim': input_dim, 'output_dim': output_dim, 'hidden_dim': params['HIDDEN_DIM'], 'num_layers': params['NUM_LAYERS'], 'dropout_rate': params['DROPOUT_RATE']}
+if __name__ == "__main__":
+    logging.info("--- Training Semi-Supervised Feature Extractor ---")
+    input_cols, target_cols = get_target_columns(MANIFEST_PATH, DATA_DIR, NUM_TARGET_FEATURES)
+    
+    logging.info("Creating training dataloader with pseudo-labels...")
+    train_dataloaders = create_prediction_dataloaders(
+        manifest_path=MANIFEST_PATH, data_dir=DATA_DIR, input_cols=input_cols, target_cols=target_cols,
+        batch_size=BATCH_SIZE, window_size=WINDOW_SIZE,
+        label_dir=PSEUDO_LABELS_DIR, label_suffix='_pseudo_labels.npy'
+    )
+    train_loader = train_dataloaders['train']
+    
+    logging.info("Creating validation/test dataloaders with original labels...")
+    val_test_dataloaders = create_prediction_dataloaders(
+        manifest_path=MANIFEST_PATH, data_dir=DATA_DIR, input_cols=input_cols, target_cols=target_cols,
+        batch_size=BATCH_SIZE, window_size=WINDOW_SIZE
+    )
+    val_loader = val_test_dataloaders['val']
+    
+    model_hyperparams = {'input_dim': len(input_cols), 'output_dim': len(target_cols), 'hidden_dim': HIDDEN_DIM, 'num_layers': NUM_LAYERS, 'dropout_rate': DROPOUT_RATE}
     model = PredictionModel(**model_hyperparams).to(DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=params['LEARNING_RATE'], weight_decay=params['WEIGHT_DECAY'])
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=3, verbose=False)
-    loss_fn = nn.HuberLoss()
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    
+    recon_loss_fn = nn.HuberLoss()
+    class_loss_fn = nn.BCEWithLogitsLoss()
+    
     best_val_loss = float('inf')
     epochs_no_improve = 0
+
     for epoch in range(EPOCHS):
         model.train()
-        total_train_loss = 0
-        pbar = tqdm(train_loader, desc=f"Trial {trial.number} Epoch {epoch+1}", leave=False)
-        for (inputs, targets), _ in pbar:
-            inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
+        total_recon_loss, total_class_loss, total_combined_loss = 0, 0, 0
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS} [Training]")
+        for (inputs, targets), labels in pbar:
+            inputs, targets, labels = inputs.to(DEVICE), targets.to(DEVICE), labels.to(DEVICE)
             optimizer.zero_grad()
-            predictions = model(inputs)
-            loss = loss_fn(predictions, targets)
-            loss.backward()
+            
+            recon_preds, class_logits = model(inputs)
+            
+            loss_recon = recon_loss_fn(recon_preds, targets)
+            loss_class = class_loss_fn(class_logits, labels)
+            
+            combined_loss = loss_recon + (LAMBDA_CLASSIFICATION * loss_class)
+            
+            combined_loss.backward()
             optimizer.step()
-            total_train_loss += loss.item()
-            pbar.set_postfix(loss=loss.item())
+            
+            total_recon_loss += loss_recon.item()
+            total_class_loss += loss_class.item()
+            total_combined_loss += combined_loss.item()
+            pbar.set_postfix(loss=combined_loss.item())
+
+        avg_recon_loss = total_recon_loss / len(pbar)
+        avg_class_loss = total_class_loss / len(pbar)
+
         model.eval()
         total_val_loss = 0
         with torch.no_grad():
-            for (inputs, targets), _ in val_loader:
+            val_pbar = tqdm(val_loader, desc=f"Epoch {epoch+1}/{EPOCHS} [Validation]")
+            for (inputs, targets), _ in val_pbar:
                 inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
-                predictions = model(inputs)
-                loss = loss_fn(predictions, targets)
+                recon_preds, _ = model(inputs)
+                loss = recon_loss_fn(recon_preds, targets)
                 total_val_loss += loss.item()
-        avg_val_loss = total_val_loss / len(val_loader)
-        scheduler.step(avg_val_loss)
+        
+        avg_val_loss = total_val_loss / len(val_pbar)
+        
+        logging.info(f"[Epoch {epoch+1}/{EPOCHS}] Train Recon Loss: {avg_recon_loss:.6f} | Train Class Loss: {avg_class_loss:.6f} | Val Recon Loss: {avg_val_loss:.6f}")
+
         if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            epochs_no_improve = 0
+            best_val_loss, epochs_no_improve = avg_val_loss, 0
+            logging.info(f"Validation loss improved. Saving best model to {MODEL_SAVE_PATH}")
+            torch.save({'model_params': model_hyperparams, 'model_state_dict': model.state_dict()}, MODEL_SAVE_PATH)
         else:
             epochs_no_improve += 1
-        trial.report(avg_val_loss, epoch)
-        if trial.should_prune():
-            raise optuna.TrialPruned()
-        if epochs_no_improve >= EARLY_STOPPING_PATIENCE:
-            logging.info(f"Trial {trial.number} stopped early at epoch {epoch+1}.")
-            break
-    return best_val_loss
-
-if __name__ == "__main__":
-    logging.info("--- Training Prediction Model (BiLSTM + Attention) with Optuna ---")
-    input_cols, target_cols = get_target_columns(MANIFEST_PATH, DATA_DIR, NUM_TARGET_FEATURES)
-    dataloaders = create_prediction_dataloaders(
-        manifest_path=MANIFEST_PATH, data_dir=DATA_DIR, input_cols=input_cols, target_cols=target_cols,
-        batch_size=BATCH_SIZE, window_size=WINDOW_SIZE, debug_mode=DEBUG_MODE
-    )
-    train_loader, val_loader = dataloaders['train'], dataloaders['val']
-    if train_loader is None or val_loader is None: raise ValueError("Dataloaders could not be created.")
-    input_dim, output_dim = len(input_cols), len(target_cols)
-    logging.info(f"Model dimensions: input_dim={input_dim}, output_dim={output_dim}")
-    study = optuna.create_study(direction="minimize", pruner=optuna.pruners.MedianPruner())
-    study.optimize(lambda trial: objective(trial, input_dim, output_dim, train_loader, val_loader), n_trials=N_TRIALS)
-    logging.info("Optimization complete.")
-    logging.info(f"Best trial validation loss: {study.best_value:.6f}")
-    logging.info(f"Best parameters found: {study.best_params}")
-    logging.info("Training final model with best parameters...")
-    best_params = study.best_params
-    model_hyperparams = {'input_dim': input_dim, 'output_dim': output_dim, 'hidden_dim': best_params['hidden_dim'], 'num_layers': best_params['num_layers'], 'dropout_rate': best_params['dropout']}
-    final_model = PredictionModel(**model_hyperparams).to(DEVICE)
-    optimizer = optim.Adam(final_model.parameters(), lr=best_params['lr'], weight_decay=best_params['weight_decay'])
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.2, patience=3, verbose=False)
-    loss_fn = nn.HuberLoss()
-    best_val_loss, epochs_no_improve = float('inf'), 0
-    with open(LOG_SAVE_PATH, "w") as log_file:
-        log_file.write("epoch,train_loss,val_loss,lr\n")
-        for epoch in range(EPOCHS):
-            final_model.train()
-            total_train_loss = 0
-            pbar = tqdm(train_loader, desc=f"Final Training Epoch {epoch+1}/{EPOCHS}")
-            for (inputs, targets), _ in pbar:
-                inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
-                optimizer.zero_grad()
-                predictions = final_model(inputs)
-                loss = loss_fn(predictions, targets)
-                loss.backward()
-                optimizer.step()
-                total_train_loss += loss.item()
-                pbar.set_postfix(loss=loss.item())
-            avg_train_loss = total_train_loss / len(pbar)
-            final_model.eval()
-            total_val_loss = 0
-            with torch.no_grad():
-                for (inputs, targets), _ in val_loader:
-                    inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
-                    predictions = final_model(inputs)
-                    loss = loss_fn(predictions, targets)
-                    total_val_loss += loss.item()
-            avg_val_loss = total_val_loss / len(val_loader)
-            scheduler.step(avg_val_loss)
-            lr = optimizer.param_groups[0]['lr']
-            logging.info(f"[Final Epoch {epoch+1}/{EPOCHS}] Train Loss: {avg_train_loss:.6f} | Val Loss: {avg_val_loss:.6f} | LR: {lr:.2e}")
-            log_file.write(f"{epoch+1},{avg_train_loss},{avg_val_loss},{lr}\n")
-            if avg_val_loss < best_val_loss:
-                best_val_loss, epochs_no_improve = avg_val_loss, 0
-                logging.info(f"Final model validation loss improved. Saving best model to {MODEL_SAVE_PATH}")
-                torch.save({'model_params': model_hyperparams, 'model_state_dict': final_model.state_dict()}, MODEL_SAVE_PATH)
-            else:
-                epochs_no_improve += 1
-                if epochs_no_improve >= EARLY_STOPPING_PATIENCE:
-                    logging.info(f"Final model early stopping triggered after {epoch+1} epochs.")
-                    break
-    logging.info("\n--- Training Complete ---")
+            if epochs_no_improve >= EARLY_STOPPING_PATIENCE:
+                logging.info(f"Early stopping triggered after {epoch+1} epochs.")
+                break
+    
+    logging.info("\n--- Semi-Supervised Training Complete ---")
