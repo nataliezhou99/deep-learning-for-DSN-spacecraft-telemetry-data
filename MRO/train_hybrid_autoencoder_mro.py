@@ -10,9 +10,9 @@ import logging
 import sys
 import math
 
-from data_utils_hybrid_vae_mro import create_prediction_dataloaders
+from data_utils_mro import create_prediction_dataloaders
 
-# --- MODEL: Transformer-Based Encoder-Decoder ---
+# --- MODEL ---
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
         super(PositionalEncoding, self).__init__()
@@ -67,7 +67,7 @@ class PredictionModel(nn.Module):
 
 # --- CONFIGURATION ---
 DEBUG_MODE = False
-PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/MRODataSet")
+PROJECT_DIR = Path("/home/nzhou/MRO")
 OUTPUT_DIR = PROJECT_DIR / "processed_data"
 DATA_DIR = PROJECT_DIR / "data_files"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
