@@ -98,4 +98,5 @@ This project is designed to be **modular**:
 ## Authors
 
 Developed by **Natalie Zhou, Olivia Wang, and Dillan Lau**.
+
 Contact Natalie Zhou: [LinkedIn](https://www.linkedin.com/in/nataliezhou99) | [GitHub](https://github.com/nataliezhou99)
