@@ -1,5 +1,3 @@
-# data_utils_hybrid_vae_jwst.py 
-
 import torch
 import numpy as np
 import pandas as pd
