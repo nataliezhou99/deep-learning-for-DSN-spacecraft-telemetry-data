@@ -79,10 +79,10 @@ class PredictionModel(nn.Module):
         return predicted_target
 
 # --- CONFIGURATION ---
-PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData/jwst_vae_work")
-DATA_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData/processed_diffusion_style/low_band/data_files")
+PROJECT_DIR = Path("/home/nzhou/JWST")
+DATA_DIR = Path("/home/nzhou/JWST/processed_diffusion_style/low_band/data_files")
 OUTPUT_DIR = PROJECT_DIR / "processed_data"
-MANIFEST_PATH = Path("/home/nzhou/updated_dsn_project/JWSTData/processed_diffusion_style/low_band/manifest.json")
+MANIFEST_PATH = Path("/home/nzhou/JWST/processed_diffusion_style/low_band/manifest.json")
 TRAINED_DL_MODEL_PATH = PROJECT_DIR / "best_prediction_model.pth"
 XGB_DATA_DIR = PROJECT_DIR / "xgboost_data"
 XGB_TRAIN_DIR = XGB_DATA_DIR / "train"
