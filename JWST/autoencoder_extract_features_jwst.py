@@ -9,7 +9,7 @@ import json
 import logging
 import sys
 
-from data_utils_hybrid_vae_jwst import create_prediction_dataloaders
+from data_utils_jwst import create_prediction_dataloaders
 
 # --- MODEL: Upgraded Attention Architecture (must match training script) ---
 class Attention(nn.Module):
@@ -81,9 +81,9 @@ TRAINED_DL_MODEL_PATH = OUTPUT_SUBDIR / f"best_prediction_model_{DATASET_TO_USE}
 
 # --- Output Files ---
 XGB_FEATURES_DIR = OUTPUT_SUBDIR / "xgboost_features_per_track"
-TEST_FEAT_PATH = XGB_DATA_DIR / "test_features.npy" # This path is for reference, script saves per track
-TEST_LABELS_PATH = XGB_DATA_DIR / "test_labels.npy"
-TEST_BOUNDARIES_PATH = XGB_DATA_DIR / "test_boundaries.npy"
+TEST_FEAT_PATH = XGB_FEATURES_DIR / "test_features.npy"  # This path is for reference, script saves per track
+TEST_LABELS_PATH = XGB_FEATURES_DIR / "test_labels.npy"
+TEST_BOUNDARIES_PATH = XGB_FEATURES_DIR / "test_boundaries.npy"
 
 # --- Hyperparameters ---
 BATCH_SIZE = 512

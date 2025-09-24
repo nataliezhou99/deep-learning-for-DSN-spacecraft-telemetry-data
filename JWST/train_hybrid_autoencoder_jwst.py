@@ -12,7 +12,7 @@ import logging
 import sys
 import random
 
-from data_utils_hybrid_vae_jwst import create_prediction_dataloaders
+from data_utils_jwst import create_prediction_dataloaders
 
 # --- MODEL: Upgraded Attention Architecture ---
 class Attention(nn.Module):

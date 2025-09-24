@@ -65,11 +65,17 @@ def create_prediction_dataloaders(
             random.shuffle(tracks)
             tracks = tracks[:20] if split != 'test' else tracks[:10]
 
-        datasets = [ 
-            SingleTrackPredictionDataset(data_dir / t['track_features'], data_dir / t['labels'], 
-                                       input_cols, target_cols, window_size, **kwargs)
-            for t in tracks 
-        ] 
+        datasets = [
+            SingleTrackPredictionDataset(
+                data_dir / t['track_features'],
+                data_dir / t['track_labels'],
+                input_cols,
+                target_cols,
+                window_size,
+                **kwargs,
+            )
+            for t in tracks
+        ]
 
         if not datasets:
             logging.warning(f"No data for split: {split}. Skipping DataLoader creation.")
