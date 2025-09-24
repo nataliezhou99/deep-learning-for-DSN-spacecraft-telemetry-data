@@ -63,8 +63,9 @@ updated_dsn_project/
 python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
-pip install torch numpy pandas scikit-learn imbalanced-learn optuna pyarrow fastparquet tqdm matplotlib seaborn'''
-2) Prepare Data
+pip install torch numpy pandas scikit-learn imbalanced-learn optuna pyarrow fastparquet tqdm matplotlib seaborn
+
+### 2) Prepare Data
 Place mission-specific raw inputs under:
 
 JWST: updated_dsn_project/JWSTData/jwst_vae_work/data_files/
