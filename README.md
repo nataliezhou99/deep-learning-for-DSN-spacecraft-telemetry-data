@@ -84,29 +84,29 @@ The pipeline scripts will:
 ## Run the Full Pipeline
 ### A) JWST
 #### 1) Build dataset & manifest
-python updated_dsn_project/JWSTData/jwst_vae_work/jwst_data_pipeline.py
+`python updated_dsn_project/JWSTData/jwst_vae_work/jwst_data_pipeline.py`
 
 #### 2) Train deep model (CNN + BiLSTM + Attention)
-python updated_dsn_project/JWSTData/jwst_vae_work/train_hybrid_vae_jwst_newest.py
+`python updated_dsn_project/JWSTData/jwst_vae_work/train_hybrid_vae_jwst_newest.py`
 
 #### 3) Extract features (latent + reconstruction error)
-python updated_dsn_project/JWSTData/jwst_vae_work/vae_extract_features_jwst_newest.py
+`python updated_dsn_project/JWSTData/jwst_vae_work/vae_extract_features_jwst_newest.py`
 
 #### 4) Train Random Forest on extracted features (Optuna + SMOTE)
-python updated_dsn_project/JWSTData/jwst_vae_work/vae_train_random_forest_jwst_newest.py
+`python updated_dsn_project/JWSTData/jwst_vae_work/vae_train_random_forest_jwst_newest.py`
 
 ### B) MRO
 #### 1) Build dataset & manifest
-python updated_dsn_project/MRODataSet/data_pipeline.py
+`python updated_dsn_project/MRODataSet/data_pipeline.py`
 
 #### 2) Train deep model (Transformer encoder + MLP decoder)
-python updated_dsn_project/MRODataSet/train_hybrid_vae.py
+`python updated_dsn_project/MRODataSet/train_hybrid_vae.py`
 
 #### 3) Extract features (latent + prediction error)
-python updated_dsn_project/MRODataSet/extract_features.py
+`python updated_dsn_project/MRODataSet/extract_features.py`
 
 #### 4) Train Random Forest on extracted features (Optuna + SMOTE)
-python updated_dsn_project/MRODataSet/vae_train_random_forest.py
+`python updated_dsn_project/MRODataSet/vae_train_random_forest.py`
 
 ## Key Artifacts & Outputs
 
