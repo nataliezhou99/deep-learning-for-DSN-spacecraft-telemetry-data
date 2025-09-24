@@ -61,7 +61,6 @@ updated_dsn_project/
 
 ### 1) Environment
 
-```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
