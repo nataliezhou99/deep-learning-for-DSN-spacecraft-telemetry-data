@@ -72,9 +72,11 @@ pip install torch numpy pandas scikit-learn imbalanced-learn optuna pyarrow fast
 Place mission-specific raw inputs under:
 - **JWST**: updated_dsn_project/JWSTData/jwst_vae_work/data_files/
 - **MRO**: updated_dsn_project/MRODataSet/data_files/
+
 Required inputs (see scripts for exact column names):
 - DSN monitoring/telemetry per-track data (parquet or pickle after ingestion)
 - Incident/DRS reports mapping track-time ranges → anomaly labels
+
 The pipeline scripts will:
 - Merge/align telemetry + incidents
 - Engineer features & scale numerics
