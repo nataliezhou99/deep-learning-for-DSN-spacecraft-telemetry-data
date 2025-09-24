@@ -37,9 +37,6 @@ updated_dsn_project/
 ├─ extract_features.py # Latents + prediction error → features for classical ML
 └─ vae_train_random_forest.py # Optuna + RF training, point-adjusted metrics, plots
 
-markdown
-Copy code
-
 ---
 
 ## What’s Interesting (Highlights)
