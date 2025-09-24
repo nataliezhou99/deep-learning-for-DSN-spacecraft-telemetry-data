@@ -1,5 +1,4 @@
 
-```markdown
 # 2D Platformer Game – *The Floor Is Lava*
 
 This repository contains a **browser-playable 2D platformer** written in C using SDL2.  
@@ -105,12 +104,3 @@ Developed by **Natalie Zhou**
 * Computer Science @ Caltech
 * Interests: game development, systems programming, applied machine learning
 * Contact: [LinkedIn](https://www.linkedin.com/in/nataliezhou99) | [GitHub](https://github.com/nataliezhou99)
-
-```
-
----
-
-✅ Just copy all of the above into a new file called `README.md` in your repo root.  
-
-Do you also want me to give you the **GitHub Pages setup instructions** so recruiters can actually play your game in their browser directly from your repo? That could make the README even stronger.
-```
