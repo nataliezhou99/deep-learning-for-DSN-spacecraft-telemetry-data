@@ -9,11 +9,9 @@ import sys
 import pandas as pd
 import random
 
-# The data utility import is updated to the new filename
 from data_utils_hybrid_vae_jwst_newest import SingleTrackPredictionDataset
 
-# --- MODEL DEFINITION (Must match the trained model) ---
-# CORRECTED Attention Class
+# --- MODEL DEFINITION ---
 class Attention(nn.Module):
     def __init__(self, hidden_dim):
         super(Attention, self).__init__()
@@ -30,7 +28,6 @@ class Attention(nn.Module):
         energy = torch.tanh(self.attn(torch.cat((hidden_repeated, encoder_outputs), dim=2)))
         energy = energy.transpose(1, 2)
         
-        # --- ⬇️ FIX: Repeat the 'v' vector for every item in the batch ⬇️ ---
         v_view = self.v.unsqueeze(0).repeat(batch_size, 1).unsqueeze(1)
         
         attn_weights = torch.bmm(v_view, energy).squeeze(1)
@@ -39,20 +36,16 @@ class Attention(nn.Module):
         context = torch.bmm(encoder_outputs.transpose(1, 2), soft_attn_weights.unsqueeze(2)).squeeze(2)
         return context
 
-
-# CORRECTED Encoder Class
 class Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers, dropout_rate):
         super(Encoder, self).__init__()
         self.cnn = nn.Sequential(
             nn.Conv1d(input_dim, 64, kernel_size=7, padding=3), nn.ReLU()
         )
-        # --- ⬇️ FIX: These two lines are now correctly indented ⬇️ ---
         self.lstm = nn.LSTM(64, hidden_dim, num_layers, batch_first=True,
                             dropout=dropout_rate if num_layers > 1 else 0, 
                             bidirectional=True)
         self.attention = Attention(hidden_dim)
-        # --- ⬆️ FIX: End of correction ⬆️ ---
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
@@ -86,10 +79,8 @@ class PredictionModel(nn.Module):
         return predicted_target
 
 # --- CONFIGURATION ---
-# --- ⬇️ PATHS UPDATED FOR JWST DATASET ⬇️ ---
 PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData/jwst_vae_work")
 DATA_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData/processed_diffusion_style/low_band/data_files")
-# --- ⬆️ PATHS UPDATED FOR JWST DATASET ⬆️ ---
 OUTPUT_DIR = PROJECT_DIR / "processed_data"
 MANIFEST_PATH = Path("/home/nzhou/updated_dsn_project/JWSTData/processed_diffusion_style/low_band/manifest.json")
 TRAINED_DL_MODEL_PATH = PROJECT_DIR / "best_prediction_model.pth"
