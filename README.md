@@ -60,8 +60,11 @@ updated_dsn_project/
 
 ### 1) Environment
 `python -m venv .venv
+
 source .venv/bin/activate
+
 pip install -U pip
+
 pip install torch numpy pandas scikit-learn imbalanced-learn optuna pyarrow fastparquet tqdm matplotlib seaborn`
 
 ### 2) Prepare Data
