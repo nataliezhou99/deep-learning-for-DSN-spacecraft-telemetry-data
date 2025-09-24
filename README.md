@@ -70,8 +70,8 @@ pip install torch numpy pandas scikit-learn imbalanced-learn optuna pyarrow fast
 ### 2) Prepare Data
 
 Place mission-specific raw inputs under:
-- **JWST**: updated_dsn_project/JWSTData/jwst_vae_work/data_files/
-- **MRO**: updated_dsn_project/MRODataSet/data_files/
+- **JWST**: `updated_dsn_project/JWSTData/jwst_vae_work/data_files/`
+- **MRO**: `updated_dsn_project/MRODataSet/data_files/`
 
 Required inputs (see scripts for exact column names):
 - DSN monitoring/telemetry per-track data (parquet or pickle after ingestion)
