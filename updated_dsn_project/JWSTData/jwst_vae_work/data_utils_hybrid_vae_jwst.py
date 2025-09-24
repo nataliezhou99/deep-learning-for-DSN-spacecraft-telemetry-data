@@ -1,0 +1,91 @@
+# data_utils_hybrid_vae_jwst.py 
+
+import torch
+import numpy as np
+import pandas as pd
+import logging
+import json
+from pathlib import Path
+from torch.utils.data import Dataset, DataLoader, ConcatDataset
+import random
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s') 
+
+class SingleTrackPredictionDataset(Dataset): 
+    def __init__(self, track_path, labels_path, input_cols, target_cols, window_size, 
+                 label_dir=None, label_suffix='_labels.npy'):
+        self.window_size = window_size
+        self.track_path = Path(track_path)
+        
+        if label_dir:
+            track_id = self.track_path.stem
+            self.labels_path = Path(label_dir) / f"{track_id}{label_suffix}"
+        else:
+            self.labels_path = Path(labels_path)
+
+        df = pd.read_parquet(self.track_path)
+        
+        self.input_features = df[input_cols].to_numpy(dtype=np.float32)
+        self.target_features = df[target_cols].to_numpy(dtype=np.float32)
+
+        if self.labels_path.exists():
+            self.labels = np.load(self.labels_path).astype(np.float32)
+        else:
+            self.labels = np.zeros((len(self.input_features), 1), dtype=np.float32)
+
+    def __len__(self): 
+        return max(0, len(self.input_features) - self.window_size + 1) 
+
+    def __getitem__(self, index): 
+        window_end = index + self.window_size
+        input_window = self.input_features[index:window_end]
+        target_at_last_step = self.target_features[window_end - 1] 
+        
+        label_window = self.labels[index:window_end]
+        label = 1.0 if np.any(label_window) else 0.0
+        
+        return (torch.tensor(input_window, dtype=torch.float32), 
+                torch.tensor(target_at_last_step, dtype=torch.float32)), \
+               torch.tensor(label, dtype=torch.float32)
+
+def create_prediction_dataloaders( 
+    manifest_path: Path, data_dir: Path, input_cols: list, target_cols: list, 
+    batch_size: int, window_size: int, num_workers: int = 0, debug_mode: bool = False, seed: int = 99,
+    **kwargs 
+):
+    logging.info(f"Creating Prediction DataLoaders from manifest: {manifest_path}")
+    with open(manifest_path, 'r') as f: manifest = json.load(f)
+    
+    random.seed(seed)
+    
+    dataloaders = {}
+    
+    for split in ['train', 'val', 'test']: 
+        tracks = manifest[split]
+        if debug_mode:
+            logging.warning(f"DEBUG MODE: Using a small subset of {split} tracks.")
+            random.shuffle(tracks)
+            tracks = tracks[:20] if split != 'test' else tracks[:10]
+
+        datasets = [ 
+            SingleTrackPredictionDataset(data_dir / t['track_features'], data_dir / t['labels'], 
+                                       input_cols, target_cols, window_size, **kwargs)
+            for t in tracks 
+        ] 
+
+        if not datasets:
+            logging.warning(f"No data for split: {split}. Skipping DataLoader creation.")
+            dataloaders[split] = None
+            continue
+            
+        full_dataset = ConcatDataset(datasets)
+        
+        is_train = split == 'train'
+        dataloaders[split] = DataLoader(
+            full_dataset, batch_size=batch_size, shuffle=is_train,
+            num_workers=num_workers, pin_memory=True, drop_last=is_train
+        )
+        logging.info(f"Created {split} loader with {len(full_dataset)} samples.")
+
+    logging.info("All Prediction DataLoaders created successfully.")
+    return dataloaders
