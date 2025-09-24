@@ -1,4 +1,3 @@
-cat > README.md << 'EOF'
 # Deep Learning for DSN Spacecraft Telemetry Data
 
 > End-to-end pipeline for anomaly detection on NASA Deep Space Network (DSN) telemetry (JWST & MRO).  
