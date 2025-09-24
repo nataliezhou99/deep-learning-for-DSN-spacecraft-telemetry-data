@@ -1,5 +1,3 @@
-# vae_train_random_forest.py
-
 import numpy as np
 from pathlib import Path
 import logging
@@ -14,7 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # --- CONFIGURATION ---
-PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/MRODataSet")
+PROJECT_DIR = Path("/home/nzhou/MRO")
 XGB_DATA_DIR = PROJECT_DIR / "xgboost_data"
 XGB_TRAIN_DIR_NORMAL = XGB_DATA_DIR / "train"
 XGB_TEST_DIR_MIXED = XGB_DATA_DIR / "test"
