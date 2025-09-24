@@ -17,9 +17,9 @@ DATASET_TO_USE = "low_band"
 # Options: "stratified_track_split", "within_track_chronological_split"
 SPLITTING_STRATEGY = "stratified_track_split" 
 
-PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData")
+PROJECT_DIR = Path("/home/nzhou/JWST")
 BASE_INPUT_DIR = PROJECT_DIR / "processed_diffusion_style"
-BASE_OUTPUT_DIR = PROJECT_DIR / "jwst_vae_work"
+BASE_OUTPUT_DIR = PROJECT_DIR
 INPUT_DATASET_DIR = BASE_INPUT_DIR / DATASET_TO_USE
 OUTPUT_SUBDIR = BASE_OUTPUT_DIR / DATASET_TO_USE
 XGB_FEATURES_DIR = OUTPUT_SUBDIR / "xgboost_features_per_track"
