@@ -9,7 +9,7 @@ import sys
 import pandas as pd
 import random
 
-from data_utils_hybrid_vae_jwst_newest import SingleTrackPredictionDataset
+from data_utils_jwst import SingleTrackPredictionDataset
 
 # --- MODEL DEFINITION ---
 class Attention(nn.Module):

@@ -22,20 +22,23 @@
 
 ## Repository Map
 
-updated_dsn_project/
-├─ JWSTData/jwst_vae_work/
-│ ├─ jwst_data_pipeline.py # Build manifest, scale/encode, save per-track parquet + labels
-│ ├─ data_utils_hybrid_vae_jwst.py # PyTorch dataset + dataloaders for sliding windows
-│ ├─ train_hybrid_vae_jwst_newest.py # CNN + BiLSTM + Attention encoder/decoder training
-│ ├─ vae_extract_features_jwst_newest.py # Latents + reconstruction error → features for classical ML
-│ └─ vae_train_random_forest_jwst_newest.py# Optuna + RF training, point-adjusted metrics, plots
+```
+deep-learning-for-DSN-spacecraft-telemetry-data/
+├─ JWST/
+│  ├─ data_pipeline_jwst.py              # Build manifest, scale/encode, save per-track parquet + labels
+│  ├─ data_utils_jwst.py                 # PyTorch dataset + dataloaders for sliding windows
+│  ├─ train_hybrid_autoencoder_jwst.py   # CNN + BiLSTM + Attention encoder/decoder training
+│  ├─ autoencoder_extract_features_jwst.py # Latents from trained DL model per track
+│  ├─ extract_features_jwst.py           # Latents + reconstruction error → features for classical ML
+│  └─ train_random_forest_jwst.py        # Random Forest training & evaluation with point-adjusted metrics
 │
-└─ MRODataSet/
-├─ data_pipeline.py # Build manifest, scale/encode, save per-track parquet + labels
-├─ data_utils_hybrid_vae.py # PyTorch dataset + dataloaders for sliding windows
-├─ train_hybrid_vae.py # Transformer encoder + MLP decoder (prediction task)
-├─ extract_features.py # Latents + prediction error → features for classical ML
-└─ vae_train_random_forest.py # Optuna + RF training, point-adjusted metrics, plots
+└─ MRO/
+   ├─ data_pipeline_mro.py              # Build manifest, scale/encode, save per-track parquet + labels
+   ├─ data_utils_hybrid_vae_mro.py      # PyTorch dataset + dataloaders for sliding windows
+   ├─ train_hybrid_vae_mro.py           # Transformer encoder + MLP decoder (prediction task)
+   ├─ extract_features_mro.py           # Latents + prediction error → features for classical ML
+   └─ vae_train_random_forest_mro.py    # Random Forest training with Optuna/SMOTE & diagnostics
+```
 
 
 ---
@@ -69,9 +72,16 @@ pip install torch numpy pandas scikit-learn imbalanced-learn optuna pyarrow fast
 
 ### 2) Prepare Data
 
-Place mission-specific raw inputs under:
-- **JWST**: `updated_dsn_project/JWSTData/jwst_vae_work/data_files/`
-- **MRO**: `updated_dsn_project/MRODataSet/data_files/`
+Each script defines a mission-specific `PROJECT_DIR` (currently pointing to `/home/nzhou/...`).
+Update those constants to wherever you store the DSN telemetry on your machine. The code expects the
+following structure under each project directory:
+
+- **JWST** (`PROJECT_DIR` default: `/home/nzhou/updated_dsn_project/JWSTData`)
+  - Raw chunked telemetry pickles and DRS CSVs alongside the pipeline script expects files like `chunk_*_mon_JWST.pkl.gz`
+  - Outputs written to `processed_diffusion_style/`
+- **MRO** (`PROJECT_DIR` default: `/home/nzhou/updated_dsn_project/MRODataSet`)
+  - Raw telemetry/incident pickles (`mons.pkl`, `drs.pkl`) in the project root
+  - Outputs written to `data_files/` and `processed_data/`
 
 Required inputs (see scripts for exact column names):
 - DSN monitoring/telemetry per-track data (parquet or pickle after ingestion)
@@ -86,29 +96,29 @@ The pipeline scripts will:
 ## Run the Full Pipeline
 ### A) JWST
 #### 1) Build dataset & manifest
-`python updated_dsn_project/JWSTData/jwst_vae_work/jwst_data_pipeline.py`
+`python JWST/data_pipeline_jwst.py`
 
 #### 2) Train deep model (CNN + BiLSTM + Attention)
-`python updated_dsn_project/JWSTData/jwst_vae_work/train_hybrid_vae_jwst_newest.py`
+`python JWST/train_hybrid_autoencoder_jwst.py`
 
-#### 3) Extract features (latent + reconstruction error)
-`python updated_dsn_project/JWSTData/jwst_vae_work/vae_extract_features_jwst_newest.py`
+#### 3) Extract features (latent encodings)
+`python JWST/autoencoder_extract_features_jwst.py`
 
-#### 4) Train Random Forest on extracted features (Optuna + SMOTE)
-`python updated_dsn_project/JWSTData/jwst_vae_work/vae_train_random_forest_jwst_newest.py`
+#### 4) Train Random Forest on extracted features (SMOTE + evaluation)
+`python JWST/train_random_forest_jwst.py`
 
 ### B) MRO
 #### 1) Build dataset & manifest
-`python updated_dsn_project/MRODataSet/data_pipeline.py`
+`python MRO/data_pipeline_mro.py`
 
 #### 2) Train deep model (Transformer encoder + MLP decoder)
-`python updated_dsn_project/MRODataSet/train_hybrid_vae.py`
+`python MRO/train_hybrid_vae_mro.py`
 
 #### 3) Extract features (latent + prediction error)
-`python updated_dsn_project/MRODataSet/extract_features.py`
+`python MRO/extract_features_mro.py`
 
 #### 4) Train Random Forest on extracted features (Optuna + SMOTE)
-`python updated_dsn_project/MRODataSet/vae_train_random_forest.py`
+`python MRO/vae_train_random_forest_mro.py`
 
 ## Key Artifacts & Outputs
 
