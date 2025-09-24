@@ -99,6 +99,7 @@ This project is designed to be **modular**:
 
 Developed by **Natalie Zhou, Olivia Wang, and Dillan Lau**
 
+
 Natalie Zhou
 * Computer Science @ Caltech
 * Interests: game development, systems programming, applied machine learning
