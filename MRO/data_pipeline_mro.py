@@ -1,5 +1,3 @@
-# data_pipeline.py
-
 import os
 import pickle
 import numpy as np
@@ -12,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 # --- 1. CONFIGURATION ---
-PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/MRODataSet")
+PROJECT_DIR = Path("/home/nzhou/MRO")
 DATA_FILES_DIR = PROJECT_DIR / "data_files"
 OUTPUT_DIR = PROJECT_DIR / "processed_data"
 MONS_FILE, DRS_FILE = "mons.pkl", "drs.pkl"
