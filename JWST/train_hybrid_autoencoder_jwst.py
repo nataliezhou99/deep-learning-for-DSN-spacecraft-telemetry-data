@@ -14,7 +14,7 @@ import random
 
 from data_utils_jwst import create_prediction_dataloaders
 
-# --- MODEL: Upgraded Attention Architecture ---
+# --- MODEL ---
 class Attention(nn.Module):
     def __init__(self, hidden_dim):
         super(Attention, self).__init__()
@@ -77,9 +77,9 @@ class PredictionModel(nn.Module):
 
 # --- CONFIGURATION ---
 DATASET_TO_USE = "low_band"
-PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData")
+PROJECT_DIR = Path("/home/nzhou/JWST")
 BASE_INPUT_DIR = PROJECT_DIR / "processed_diffusion_style"
-BASE_OUTPUT_DIR = PROJECT_DIR / "jwst_vae_work"
+BASE_OUTPUT_DIR = PROJECT_DIR
 INPUT_DATASET_DIR = BASE_INPUT_DIR / DATASET_TO_USE
 OUTPUT_SUBDIR = BASE_OUTPUT_DIR / DATASET_TO_USE
 OUTPUT_SUBDIR.mkdir(parents=True, exist_ok=True)
