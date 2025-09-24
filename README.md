@@ -18,8 +18,6 @@ avoid hazards like lava and water, collect gems, and reach the door to advance l
 - Multiple interactive levels with buttons, doors, and elevators
 - Victory condition: reach the exit door
 
-![Homepage Screenshot](assets/homepage.png)
-
 ---
 
 ## ✨ Features
@@ -99,7 +97,7 @@ This project is designed to be **modular**:
 
 ## 👩‍💻 Author
 
-Developed by **Natalie Zhou**
+Developed by **Natalie Zhou, Olivia Wang, and Dillan Lau**
 
 * Computer Science @ Caltech
 * Interests: game development, systems programming, applied machine learning
