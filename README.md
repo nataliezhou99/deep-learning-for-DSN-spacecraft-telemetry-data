@@ -16,7 +16,7 @@
   4. **Train Random Forest** on extracted features → anomaly scores  
   5. **Evaluate** with point-adjusted F1, ROC/PR, confusion matrix
 - **Missions:** JWST and MRO (separate scripts, same pattern)
-- **Extras:** Optuna hyper-param search, SMOTE class balancing, clear artifacts & logs.
+- **Extras:** Optuna hyper-param search, SMOTE class balancing, clear artifacts & logs
 
 ---
 
@@ -42,14 +42,14 @@ updated_dsn_project/
 
 ## What’s Interesting (Highlights)
 
-- **Time-aware features:** `seconds_since_start`, cyclical time (`hour_sin/cos`, `dayofweek_sin/cos`), per-track alignment to a **global start**.
-- **Data quality:** high-cardinality categorical drop, correlated-feature pruning, missingness thresholding, **StandardScaler** on numerics.
-- **Windowed labels:** window label = `any(anomaly)` → precise **point-adjusted scoring** during eval.
+- **Time-aware features:** `seconds_since_start`, cyclical time (`hour_sin/cos`, `dayofweek_sin/cos`), per-track alignment to a **global start**
+- **Data quality:** high-cardinality categorical drop, correlated-feature pruning, missingness thresholding, **StandardScaler** on numerics
+- **Windowed labels:** window label = `any(anomaly)` → precise **point-adjusted scoring** during eval
 - **Two-stage modeling:**
-  - Stage 1: DL model learns **compressed representations** while predicting hardest (high-variance) targets.
-  - Stage 2: Classical ML on **latent features + error** (strong anomaly signal).
-- **Imbalance handling:** SMOTE + threshold search for best **point-adjusted F1**.
-- **Reproducible artifacts:** per-track parquet features & `.npy` labels, `manifest.json`, saved models, plots, CSV logs.
+  - Stage 1: DL model learns **compressed representations** while predicting hardest (high-variance) targets
+  - Stage 2: Classical ML on **latent features + error** (strong anomaly signal)
+- **Imbalance handling:** SMOTE + threshold search for best **point-adjusted F1**
+- **Reproducible artifacts:** per-track parquet features & `.npy` labels, `manifest.json`, saved models, plots, CSV logs
 
 ---
 
@@ -125,34 +125,34 @@ The pipeline scripts will:
 
 ## Modeling Details
 
-- **JWST:** Hybrid CNN → BiLSTM → **Attention** encoder with a decoder head to predict selected targets.  
-- **MRO:** **Transformer** encoder (positional encoding) + MLP decoder.  
-- **Targets:** Top-variance numeric telemetry signals (auto-selected from training split).  
-- **Features to RF:** Latent state (encoder output) **+** per-window reconstruction/prediction **error** (Huber-style).  
-- **Optimization:** Optuna search for RF (`n_estimators`, `max_depth`, etc.).  
-- **Class imbalance:** Oversampling via SMOTE.
+- **JWST:** Hybrid CNN → BiLSTM → **Attention** encoder with a decoder head to predict selected targets
+- **MRO:** **Transformer** encoder (positional encoding) + MLP decoder
+- **Targets:** Top-variance numeric telemetry signals (auto-selected from training split)  
+- **Features to RF:** Latent state (encoder output) **+** per-window reconstruction/prediction **error** (Huber-style)  
+- **Optimization:** Optuna search for RF (`n_estimators`, `max_depth`, etc.)
+- **Class imbalance:** Oversampling via SMOTE
 
 ---
 
 ## Evaluation
 
-- **Primary:** **Point-adjusted F1** — if any timestamp in an incident window is hit, count the whole window as detected.  
-- **Secondary:** Precision/Recall, ROC-AUC, confusion matrix (threshold chosen by best point-adjusted F1).  
-- **Why point-adjusted?** Detecting *events* matters more than every single timestamp.
+- **Primary:** **Point-adjusted F1** — if any timestamp in an incident window is hit, count the whole window as detected
+- **Secondary:** Precision/Recall, ROC-AUC, confusion matrix (threshold chosen by best point-adjusted F1)
+- **Why point-adjusted?** Detecting *events* matters more than every single timestamp
 
 ---
 
 ## Reproducibility & Portability
 
-- Set a consistent `RANDOM_SEED` in the pipelines (present in code).
-- All transformations (drop rules, scaler fitting, selected columns) are derived **only** from the training split & serialized alongside outputs.
+- Set a consistent `RANDOM_SEED` in the pipelines (present in code)
+- All transformations (drop rules, scaler fitting, selected columns) are derived **only** from the training split & serialized alongside outputs
 
 ---
 
 ## Hardware
 
-- Runs on CPU or GPU (`cuda` auto-detect).  
-- Preprocessing is I/O-heavy; DL training benefits from GPU.
+- Runs on CPU or GPU (`cuda` auto-detect)
+- Preprocessing is I/O-heavy; DL training benefits from GPU
 
 ---
 
