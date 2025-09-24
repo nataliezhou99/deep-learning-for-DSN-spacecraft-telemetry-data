@@ -7,7 +7,7 @@
 
 ## TL;DR
 
-- **Goal:** Detect & localize anomalies in spacecraft telemetry time series from DSN passes.
+- **Goal:** Detect & localize anomalies in spacecraft telemetry time series from DSN passes
 - **Data:** Mission telemetry + incident reports (per-track labels). *(Raw data not included.)*
 - **Pipeline:**
   1. **Preprocess** & align tracks → engineered features → train/val/test manifest  
