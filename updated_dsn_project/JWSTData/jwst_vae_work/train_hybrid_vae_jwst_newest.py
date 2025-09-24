@@ -10,11 +10,9 @@ import logging
 import sys
 import optuna
 
-# The data utility import is updated to the new filename
 from data_utils_hybrid_vae_jwst_newest import create_prediction_dataloaders
 
 # --- MODEL: CNN + Bidirectional LSTM + Attention ---
-# CORRECTED Attention Class
 class Attention(nn.Module):
     def __init__(self, hidden_dim):
         super(Attention, self).__init__()
@@ -40,20 +38,16 @@ class Attention(nn.Module):
         context = torch.bmm(encoder_outputs.transpose(1, 2), soft_attn_weights.unsqueeze(2)).squeeze(2)
         return context
 
-
-# CORRECTED Encoder Class
 class Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers, dropout_rate):
         super(Encoder, self).__init__()
         self.cnn = nn.Sequential(
             nn.Conv1d(input_dim, 64, kernel_size=7, padding=3), nn.ReLU()
         )
-        # --- ⬇️ FIX: These two lines are now correctly indented ⬇️ ---
         self.lstm = nn.LSTM(64, hidden_dim, num_layers, batch_first=True,
                             dropout=dropout_rate if num_layers > 1 else 0, 
                             bidirectional=True)
         self.attention = Attention(hidden_dim)
-        # --- ⬆️ FIX: End of correction ⬆️ ---
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
@@ -88,10 +82,8 @@ class PredictionModel(nn.Module):
 
 # --- 1. CONFIGURATION ---
 DEBUG_MODE = False
-# --- ⬇️ PATHS UPDATED FOR JWST DATASET ⬇️ ---
 PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData/jwst_vae_work")
 DATA_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData/processed_diffusion_style/low_band/data_files")
-# --- ⬆️ PATHS UPDATED FOR JWST DATASET ⬆️ ---
 OUTPUT_DIR = PROJECT_DIR / "processed_data"
 MANIFEST_PATH = Path("/home/nzhou/updated_dsn_project/JWSTData/processed_diffusion_style/low_band/manifest.json")
 MODEL_SAVE_PATH = PROJECT_DIR / "best_prediction_model.pth"
