@@ -9,9 +9,9 @@ import sys
 import pandas as pd
 import math
 
-from data_utils_hybrid_vae_mro import SingleTrackPredictionDataset
+from data_utils_mro import SingleTrackPredictionDataset
 
-# --- MODEL DEFINITION (Must match the trained model) ---
+# --- MODEL ---
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
         super(PositionalEncoding, self).__init__()
@@ -65,7 +65,7 @@ class PredictionModel(nn.Module):
         return predicted_target
 
 # --- CONFIGURATION ---
-PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/MRODataSet")
+PROJECT_DIR = Path("/home/nzhou/MRO")
 OUTPUT_DIR = PROJECT_DIR / "processed_data"
 DATA_DIR = PROJECT_DIR / "data_files"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
