@@ -59,13 +59,10 @@ updated_dsn_project/
 > Change these to your local repo path before running.
 
 ### 1) Environment
-`python -m venv .venv`
-
-`source .venv/bin/activate`
-
-`pip install -U pip`
-
-`pip install torch numpy pandas scikit-learn imbalanced-learn optuna pyarrow fastparquet tqdm matplotlib seaborn`
+`python -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install torch numpy pandas scikit-learn imbalanced-learn optuna pyarrow fastparquet tqdm matplotlib seaborn`
 
 ### 2) Prepare Data
 
