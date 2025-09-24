@@ -1,41 +1,55 @@
-import pandas as pd
-import torch
-import numpy as np
-from pathlib import Path
-from torch import nn
-from torch.nn import functional as F
-from tqdm import tqdm
+"""Generate JWST latent features for downstream classical models."""
+
 import json
 import logging
 import sys
+from pathlib import Path
 
-from data_utils_hybrid_vae_jwst import create_prediction_dataloaders
+import numpy as np
+import pandas as pd
+import torch
+from torch import nn
+from torch.nn import functional as F
+from tqdm import tqdm
 
-# --- MODEL: Upgraded Attention Architecture (must match training script) ---
+from data_utils_jwst import create_prediction_dataloaders
+
+
 class Attention(nn.Module):
-    def __init__(self, hidden_dim):
-        super(Attention, self).__init__()
+    """Attention module matching the training architecture."""
+
+    def __init__(self, hidden_dim: int) -> None:
+        super().__init__()
         self.attention_net = nn.Sequential(
             nn.Linear(hidden_dim * 2, hidden_dim),
             nn.Tanh(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(hidden_dim, 1),
         )
-    def forward(self, lstm_output):
+
+    def forward(self, lstm_output: torch.Tensor) -> torch.Tensor:
         attention_scores = self.attention_net(lstm_output).squeeze(2)
         attention_weights = F.softmax(attention_scores, dim=1)
         context_vector = torch.bmm(lstm_output.transpose(1, 2), attention_weights.unsqueeze(2)).squeeze(2)
         return context_vector
 
+
 class Encoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_layers, dropout_rate):
-        super(Encoder, self).__init__()
-        self.cnn = nn.Sequential(
-            nn.Conv1d(input_dim, 64, kernel_size=7, padding=3), nn.ReLU()
+    """CNN + BiLSTM encoder with attention pooling."""
+
+    def __init__(self, input_dim: int, hidden_dim: int, num_layers: int, dropout_rate: float) -> None:
+        super().__init__()
+        self.cnn = nn.Sequential(nn.Conv1d(input_dim, 64, kernel_size=7, padding=3), nn.ReLU())
+        self.lstm = nn.LSTM(
+            64,
+            hidden_dim,
+            num_layers,
+            batch_first=True,
+            dropout=dropout_rate if num_layers > 1 else 0,
+            bidirectional=True,
         )
-        self.lstm = nn.LSTM(64, hidden_dim, num_layers, batch_first=True,
-                            dropout=dropout_rate if num_layers > 1 else 0, bidirectional=True)
         self.attention = Attention(hidden_dim)
-    def forward(self, x):
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x.permute(0, 2, 1)
         x = self.cnn(x)
         x = x.permute(0, 2, 1)
@@ -43,30 +57,39 @@ class Encoder(nn.Module):
         context_vector = self.attention(lstm_out)
         return context_vector
 
+
 class Decoder(nn.Module):
-    def __init__(self, hidden_dim, output_dim):
-        super(Decoder, self).__init__()
+    """MLP decoder retained for checkpoint compatibility."""
+
+    def __init__(self, hidden_dim: int, output_dim: int) -> None:
+        super().__init__()
         self.mlp = nn.Sequential(
             nn.Linear(hidden_dim * 2, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, output_dim)
+            nn.Linear(hidden_dim, output_dim),
         )
-    def forward(self, z):
+
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
         return self.mlp(z)
 
+
 class PredictionModel(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim, num_layers, dropout_rate):
-        super(PredictionModel, self).__init__()
+    """Encoder-only inference model for latent extraction."""
+
+    def __init__(self, input_dim: int, output_dim: int, hidden_dim: int, num_layers: int, dropout_rate: float) -> None:
+        super().__init__()
         self.encoder = Encoder(input_dim, hidden_dim, num_layers, dropout_rate)
         self.decoder = Decoder(hidden_dim, output_dim)
         self.classification_head = nn.Sequential(
             nn.Linear(hidden_dim * 2, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(hidden_dim, 1),
         )
-    def forward(self, x):
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         encoded_state = self.encoder(x)
         return encoded_state
+
 
 # --- CONFIGURATION ---
 DATASET_TO_USE = "low_band"
@@ -81,9 +104,9 @@ TRAINED_DL_MODEL_PATH = OUTPUT_SUBDIR / f"best_prediction_model_{DATASET_TO_USE}
 
 # --- Output Files ---
 XGB_FEATURES_DIR = OUTPUT_SUBDIR / "xgboost_features_per_track"
-TEST_FEAT_PATH = XGB_DATA_DIR / "test_features.npy" # This path is for reference, script saves per track
-TEST_LABELS_PATH = XGB_DATA_DIR / "test_labels.npy"
-TEST_BOUNDARIES_PATH = XGB_DATA_DIR / "test_boundaries.npy"
+TEST_FEAT_PATH = XGB_FEATURES_DIR / "test_features.npy"  # This path is for reference, script saves per track
+TEST_LABELS_PATH = XGB_FEATURES_DIR / "test_labels.npy"
+TEST_BOUNDARIES_PATH = XGB_FEATURES_DIR / "test_boundaries.npy"
 
 # --- Hyperparameters ---
 BATCH_SIZE = 512
@@ -93,7 +116,9 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', stream=sys.stdout)
 
-def get_target_columns(manifest_path, data_dir, num_targets):
+def get_target_columns(manifest_path: Path, data_dir: Path, num_targets: int) -> tuple[list[str], list[str]]:
+    """Replicate the training-time target selection."""
+
     with open(manifest_path, 'r') as f: manifest = json.load(f)
     train_files = [data_dir / item['track_features'] for item in manifest['train']]
     df_list = [pd.read_parquet(f) for f in train_files[:50]]

@@ -1,4 +1,4 @@
-# data_pipeline.py
+"""MRO data preprocessing pipeline for DSN telemetry."""
 
 import os
 import pickle
@@ -30,6 +30,8 @@ RANDOM_SEED = 42
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.FileHandler(LOG_FILE, mode='w'), logging.StreamHandler(sys.stdout)])
 
 def load_raw_dsn_data(data_dir: Path, mons_fn: str, drs_fn: str) -> tuple[list, list]:
+    """Load monitoring tracks and incident reports from disk."""
+
     logging.info(f"Loading raw data from {data_dir}...")
     mons_path, drs_path = data_dir / mons_fn, data_dir / drs_fn
     if not mons_path.exists() or not drs_path.exists(): raise FileNotFoundError(f"Raw data files not found in {data_dir}")
@@ -38,6 +40,8 @@ def load_raw_dsn_data(data_dir: Path, mons_fn: str, drs_fn: str) -> tuple[list, 
     return mons, drs
 
 def find_global_start_time(mons: list, timestamp_col: str) -> pd.Timestamp:
+    """Determine the earliest timestamp across all tracks."""
+
     logging.info("Finding the global start time...")
     min_time = pd.Timestamp.max
     for _, track_df in mons:
@@ -46,6 +50,8 @@ def find_global_start_time(mons: list, timestamp_col: str) -> pd.Timestamp:
     return min_time
 
 def split_tracks_by_id(mons: list, drs: list, train_ratio: float, val_ratio: float, seed: int) -> tuple[list, list, list]:
+    """Split track identifiers into train/validation/test buckets."""
+
     logging.info("Splitting track IDs...")
     np.random.seed(seed)
     all_track_ids = {track[0] for track in mons}
@@ -59,6 +65,8 @@ def split_tracks_by_id(mons: list, drs: list, train_ratio: float, val_ratio: flo
     return train_ids, val_ids, test_ids
 
 def process_and_save_track(track_id, mons_map, drs_map, global_start, transformations, scaler):
+    """Transform a track, persist parquet + labels, and return manifest entries."""
+
     track_df = mons_map[track_id].copy()
     label_mask = np.zeros((len(track_df), 1), dtype=np.float32)
     if track_id in drs_map:

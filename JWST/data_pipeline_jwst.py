@@ -1,17 +1,19 @@
-import os 
-import pickle 
-import gzip 
-import numpy as np 
-import pandas as pd 
-import sys 
-import logging 
-import random 
-import json 
-from pathlib import Path 
-from sklearn.preprocessing import MinMaxScaler
-from tqdm import tqdm 
+"""JWST data preprocessing pipeline for DSN telemetry."""
 
-# --- 1. CONFIGURATION --- 
+import os
+import pickle
+import gzip
+import numpy as np
+import pandas as pd
+import sys
+import logging
+import random
+import json
+from pathlib import Path
+from sklearn.preprocessing import MinMaxScaler
+from tqdm import tqdm
+
+# --- 1. CONFIGURATION ---
 PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData") 
 CHUNK_FILE_PATTERN = "chunk_*_mon_JWST.pkl.gz" 
 DRS_FILE = "all_dr_data.csv" 
@@ -40,8 +42,17 @@ logging.basicConfig(level=logging.INFO,
                                logging.StreamHandler(sys.stdout)]) 
 
 # --- Helper Functions --- 
-def process_chunks_incrementally(data_dir: Path, file_pattern: str, split_col: str, low_range: tuple, high_range: tuple, cols_to_drop: list):
-    logging.info(f"Loading and splitting tracks into low and high frequency bands from '{file_pattern}'...") 
+def process_chunks_incrementally(
+    data_dir: Path,
+    file_pattern: str,
+    split_col: str,
+    low_range: tuple,
+    high_range: tuple,
+    cols_to_drop: list,
+):
+    """Yield per-track DataFrames split into low/high frequency bands."""
+
+    logging.info(f"Loading and splitting tracks into low and high frequency bands from '{file_pattern}'...")
     low_band_tracks, high_band_tracks = [], [] 
     chunk_files = sorted(data_dir.glob(file_pattern)) 
     if not chunk_files: raise FileNotFoundError(f"No chunk files found matching pattern '{file_pattern}' in {data_dir}") 
@@ -58,15 +69,19 @@ def process_chunks_incrementally(data_dir: Path, file_pattern: str, split_col: s
     logging.info(f"Finished processing chunks. Low-band tracks: {len(low_band_tracks)}, High-band tracks: {len(high_band_tracks)}") 
     return low_band_tracks, high_band_tracks 
 
-def load_jwst_anomalies(data_dir: Path, drs_fn: str) -> pd.DataFrame: 
-    logging.info(f"Loading anomaly data from {drs_fn}...") 
+def load_jwst_anomalies(data_dir: Path, drs_fn: str) -> pd.DataFrame:
+    """Load JWST anomaly incident reports."""
+
+    logging.info(f"Loading anomaly data from {drs_fn}...")
     drs_path = data_dir / drs_fn 
     if not drs_path.exists(): raise FileNotFoundError(f"Anomaly file not found: {drs_path}") 
     anomaly_df = pd.read_csv(drs_path) 
     return anomaly_df 
 
-def find_global_start_time(all_tracks: list, anomaly_df: pd.DataFrame, ts_col: str) -> float: 
-    logging.info("Finding the global start time...") 
+def find_global_start_time(all_tracks: list, anomaly_df: pd.DataFrame, ts_col: str) -> float:
+    """Compute a shared reference timestamp across telemetry and anomalies."""
+
+    logging.info("Finding the global start time...")
     min_track_time = min(track_df[ts_col].min() for _, track_df in all_tracks if not track_df.empty) 
     anomaly_df['INCIDENT_START_TIME_DT'] = pd.to_numeric(anomaly_df['INCIDENT_START_TIME_DT']) 
     anomaly_df['INCIDENT_END_TIME_DT'] = pd.to_numeric(anomaly_df['INCIDENT_END_TIME_DT']) 
@@ -75,14 +90,24 @@ def find_global_start_time(all_tracks: list, anomaly_df: pd.DataFrame, ts_col: s
     logging.info(f"Global start time (in seconds) found: {global_min}") 
     return global_min 
 
-def filter_tracks_by_length(all_tracks: list, min_length: int) -> list: 
-    logging.info(f"Filtering tracks to keep only those with length >= {min_length}...") 
+def filter_tracks_by_length(all_tracks: list, min_length: int) -> list:
+    """Remove tracks shorter than the required number of samples."""
+
+    logging.info(f"Filtering tracks to keep only those with length >= {min_length}...")
     filtered_tracks = [track for track in all_tracks if len(track[1]) >= min_length] 
     logging.info(f"Length filtering complete. Kept {len(filtered_tracks)} out of {len(all_tracks)} tracks.") 
     return filtered_tracks 
 
-def sample_stratified_by_row_count(anomalous_tracks: list, normal_tracks: list, target_anom_rows: int, target_normal_rows: int, seed: int):
-    logging.info("Performing stratified sampling...") 
+def sample_stratified_by_row_count(
+    anomalous_tracks: list,
+    normal_tracks: list,
+    target_anom_rows: int,
+    target_normal_rows: int,
+    seed: int,
+):
+    """Sample tracks until the target anomalous/normal row counts are reached."""
+
+    logging.info("Performing stratified sampling...")
     random.seed(seed) 
     sampled_tracks = [] 
     random.shuffle(anomalous_tracks) 
@@ -103,8 +128,10 @@ def sample_stratified_by_row_count(anomalous_tracks: list, normal_tracks: list, 
     logging.info(f"Sampling complete. Total tracks: {len(sampled_tracks)}, Total rows: {current_anom_rows + current_normal_rows:,}") 
     return sampled_tracks 
 
-def identify_anomalous_tracks(all_tracks: list, anomaly_df: pd.DataFrame, ts_col: str, global_start: float) -> set: 
-    logging.info("Scanning all tracks to identify which ones contain anomalies...") 
+def identify_anomalous_tracks(all_tracks: list, anomaly_df: pd.DataFrame, ts_col: str, global_start: float) -> set:
+    """Identify original track IDs that contain known anomaly windows."""
+
+    logging.info("Scanning all tracks to identify which ones contain anomalies...")
     anomalous_original_ids = set() 
     norm_anom_df = anomaly_df.copy() 
     norm_anom_df['start_norm'] = norm_anom_df['INCIDENT_START_TIME_DT'] - global_start 
@@ -118,8 +145,16 @@ def identify_anomalous_tracks(all_tracks: list, anomaly_df: pd.DataFrame, ts_col
     logging.info(f"Identified {len(anomalous_original_ids)} original tracks with known anomalies.") 
     return anomalous_original_ids 
 
-def dynamic_split_tracks(all_tracks: list, anomalous_split_ids: set, train_ratio: float, val_ratio: float, seed: int) -> tuple[list, list, list]: 
-    logging.info(f"Splitting data into Train/Val/Test sets...") 
+def dynamic_split_tracks(
+    all_tracks: list,
+    anomalous_split_ids: set,
+    train_ratio: float,
+    val_ratio: float,
+    seed: int,
+) -> tuple[list, list, list]:
+    """Derive train/val/test splits while preserving anomalous tracks for evaluation."""
+
+    logging.info(f"Splitting data into Train/Val/Test sets...")
     np.random.seed(seed) 
     all_track_ids = {track[0] for track in all_tracks} 
     normal_track_ids = list(all_track_ids - anomalous_split_ids) 
@@ -134,8 +169,10 @@ def dynamic_split_tracks(all_tracks: list, anomalous_split_ids: set, train_ratio
     logging.info(f"Split complete. Train: {len(train_ids)}, Val: {len(val_ids)}, Test: {len(test_ids)} (including {len(anomalous_split_ids)} anomalous).") 
     return train_ids, val_ids, test_ids 
 
-def process_and_save_jwst_track(track_df, track_id, config, transformations, scaler, data_files_dir): 
-    df = track_df.copy() 
+def process_and_save_jwst_track(track_df, track_id, config, transformations, scaler, data_files_dir):
+    """Transform a single track, save parquet/features, and return artifact names."""
+
+    df = track_df.copy()
     df['seconds_since_start'] = df[TIMESTAMP_COLUMN_NAME] - config['global_start_time'] 
     dt_series = pd.to_datetime(df['seconds_since_start'], unit='s') 
     df['hour_sin'] = np.sin(2 * np.pi * dt_series.dt.hour / 24.0) 
@@ -178,8 +215,10 @@ def process_and_save_jwst_track(track_df, track_id, config, transformations, sca
     
     return track_filename.name, labels_filename.name 
 
-def process_dataset(tracks_list, dataset_name, config): 
-    logging.info(f"--- Processing {dataset_name} Dataset (Diffusion-Style Output) ---") 
+def process_dataset(tracks_list, dataset_name, config):
+    """Process, transform, and persist tracks for a frequency-specific dataset."""
+
+    logging.info(f"--- Processing {dataset_name} Dataset (Diffusion-Style Output) ---")
     dataset_output_dir = OUTPUT_DIR / dataset_name 
     data_files_dir = dataset_output_dir / "data_files" 
     dataset_output_dir.mkdir(parents=True, exist_ok=True) 

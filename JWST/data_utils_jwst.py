@@ -1,20 +1,26 @@
-import torch
+"""Data loading utilities for JWST prediction models."""
+
+import json
+import logging
+import random
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import logging
-import json
-from pathlib import Path
-from torch.utils.data import Dataset, DataLoader, ConcatDataset
-import random
+import torch
+from torch.utils.data import ConcatDataset, DataLoader, Dataset
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s') 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class SingleTrackPredictionDataset(Dataset): 
-    def __init__(self, track_path, labels_path, input_cols, target_cols, window_size, 
+
+class SingleTrackPredictionDataset(Dataset):
+    """Create sliding windows for a single JWST telemetry track."""
+
+    def __init__(self, track_path, labels_path, input_cols, target_cols, window_size,
                  label_dir=None, label_suffix='_labels.npy'):
         self.window_size = window_size
         self.track_path = Path(track_path)
-        
+
         if label_dir:
             track_id = self.track_path.stem
             self.labels_path = Path(label_dir) / f"{track_id}{label_suffix}"
@@ -31,14 +37,18 @@ class SingleTrackPredictionDataset(Dataset):
         else:
             self.labels = np.zeros((len(self.input_features), 1), dtype=np.float32)
 
-    def __len__(self): 
-        return max(0, len(self.input_features) - self.window_size + 1) 
+    def __len__(self):
+        """Return the number of available sliding windows."""
 
-    def __getitem__(self, index): 
+        return max(0, len(self.input_features) - self.window_size + 1)
+
+    def __getitem__(self, index):
+        """Return input/target tensors and the window-level anomaly label."""
+
         window_end = index + self.window_size
         input_window = self.input_features[index:window_end]
-        target_at_last_step = self.target_features[window_end - 1] 
-        
+        target_at_last_step = self.target_features[window_end - 1]
+
         label_window = self.labels[index:window_end]
         label = 1.0 if np.any(label_window) else 0.0
         
@@ -46,11 +56,13 @@ class SingleTrackPredictionDataset(Dataset):
                 torch.tensor(target_at_last_step, dtype=torch.float32)), \
                torch.tensor(label, dtype=torch.float32)
 
-def create_prediction_dataloaders( 
-    manifest_path: Path, data_dir: Path, input_cols: list, target_cols: list, 
+def create_prediction_dataloaders(
+    manifest_path: Path, data_dir: Path, input_cols: list, target_cols: list,
     batch_size: int, window_size: int, num_workers: int = 0, debug_mode: bool = False, seed: int = 99,
-    **kwargs 
+    **kwargs
 ):
+    """Create PyTorch DataLoaders for each manifest split."""
+
     logging.info(f"Creating Prediction DataLoaders from manifest: {manifest_path}")
     with open(manifest_path, 'r') as f: manifest = json.load(f)
     
@@ -65,11 +77,17 @@ def create_prediction_dataloaders(
             random.shuffle(tracks)
             tracks = tracks[:20] if split != 'test' else tracks[:10]
 
-        datasets = [ 
-            SingleTrackPredictionDataset(data_dir / t['track_features'], data_dir / t['labels'], 
-                                       input_cols, target_cols, window_size, **kwargs)
-            for t in tracks 
-        ] 
+        datasets = [
+            SingleTrackPredictionDataset(
+                data_dir / t['track_features'],
+                data_dir / t['track_labels'],
+                input_cols,
+                target_cols,
+                window_size,
+                **kwargs,
+            )
+            for t in tracks
+        ]
 
         if not datasets:
             logging.warning(f"No data for split: {split}. Skipping DataLoader creation.")

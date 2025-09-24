@@ -1,21 +1,22 @@
-import numpy as np
-from pathlib import Path
-import logging
-import sys
-import pickle
-from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, confusion_matrix
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
+"""Train a Random Forest classifier on JWST latent features."""
+
 import json
-from tqdm import tqdm
+import logging
+import pickle
+import sys
+from pathlib import Path
+
+import numpy as np
 from imblearn.over_sampling import SMOTE
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 # --- CONFIGURATION ---
 DATASET_TO_USE = "low_band"
 
-# Choose your splitting strategy here
-# Options: "stratified_track_split", "within_track_chronological_split"
-SPLITTING_STRATEGY = "stratified_track_split" 
+SPLITTING_STRATEGY = "stratified_track_split"
 
 PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData")
 BASE_INPUT_DIR = PROJECT_DIR / "processed_diffusion_style"
@@ -36,7 +37,11 @@ logging.basicConfig(level=logging.INFO,
                               logging.StreamHandler(sys.stdout)])
 
 # --- EVALUATION & DATA LOADING FUNCTIONS ---
-def _get_events(y_true):
+
+
+def _get_events(y_true: np.ndarray) -> list[tuple[int, int]]:
+    """Identify contiguous anomaly windows for point-adjusted scoring."""
+
     events = []
     y_true_diff = np.diff(np.concatenate(([0], y_true, [0])))
     starts = np.where(y_true_diff == 1)[0]
@@ -45,7 +50,9 @@ def _get_events(y_true):
         events.append((start, end))
     return events
 
-def find_best_f1_point_adjusted(labels, scores):
+def find_best_f1_point_adjusted(labels: np.ndarray, scores: np.ndarray) -> tuple[float, float, float, float, np.ndarray]:
+    """Grid-search score thresholds with point-adjusted F1 as objective."""
+
     if len(np.unique(labels)) < 2:
         logging.warning("Evaluation set has only one class. Cannot calculate F1 score. Returning 0.")
         return 0.0, 0.0, 0.0, 0.0, np.array([])
@@ -75,7 +82,9 @@ def find_best_f1_point_adjusted(labels, scores):
     cm = confusion_matrix(labels, final_adjusted_predictions)
     return best_f1, precision, recall, best_threshold, cm
 
-def load_data_from_tracks(track_list, desc):
+def load_data_from_tracks(track_list: list[dict], desc: str) -> tuple[np.ndarray, np.ndarray]:
+    """Load concatenated feature/label arrays for the provided track manifest entries."""
+
     all_features = []
     all_labels = []
     for track_info in tqdm(track_list, desc=desc):

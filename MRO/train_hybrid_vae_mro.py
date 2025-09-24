@@ -1,23 +1,26 @@
-# train_hybrid_vae.py
+"""Train the MRO transformer-based prediction model."""
 
-import torch
-import numpy as np
-import pandas as pd
-from pathlib import Path
-from torch import optim, nn
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from tqdm import tqdm
 import json
 import logging
-import sys
 import math
+import sys
+from pathlib import Path
 
-from data_utils_hybrid_vae import create_prediction_dataloaders
+import numpy as np
+import pandas as pd
+import torch
+from torch import nn, optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from tqdm import tqdm
 
-# --- MODEL: Transformer-Based Encoder-Decoder ---
+from data_utils_hybrid_vae_mro import create_prediction_dataloaders
+
+
 class PositionalEncoding(nn.Module):
+    """Standard sinusoidal positional encoding."""
+
     def __init__(self, d_model, dropout=0.1, max_len=5000):
-        super(PositionalEncoding, self).__init__()
+        super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
@@ -31,9 +34,12 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1), :]
         return self.dropout(x)
 
+
 class TransformerEncoder(nn.Module):
+    """Transformer encoder mirroring the inference-time architecture."""
+
     def __init__(self, input_dim, d_model, n_heads, num_encoder_layers, dim_feedforward, dropout):
-        super(TransformerEncoder, self).__init__()
+        super().__init__()
         self.d_model = d_model
         self.embedding = nn.Linear(input_dim, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
@@ -46,26 +52,35 @@ class TransformerEncoder(nn.Module):
         output = self.transformer_encoder(src)
         return output[:, -1, :]
 
+
 class Decoder(nn.Module):
+    """MLP decoder that predicts high-variance targets."""
+
     def __init__(self, d_model, output_dim):
-        super(Decoder, self).__init__()
+        super().__init__()
         self.mlp = nn.Sequential(
             nn.Linear(d_model, d_model * 2),
             nn.ReLU(),
-            nn.Linear(d_model * 2, output_dim)
+            nn.Linear(d_model * 2, output_dim),
         )
+
     def forward(self, z):
         return self.mlp(z)
 
+
 class PredictionModel(nn.Module):
+    """Transformer prediction model used during training."""
+
     def __init__(self, input_dim, output_dim, d_model, n_heads, num_encoder_layers, dim_feedforward, dropout):
-        super(PredictionModel, self).__init__()
+        super().__init__()
         self.encoder = TransformerEncoder(input_dim, d_model, n_heads, num_encoder_layers, dim_feedforward, dropout)
         self.decoder = Decoder(d_model, output_dim)
+
     def forward(self, x):
         encoded_state = self.encoder(x)
         predicted_target = self.decoder(encoded_state)
         return predicted_target
+
 
 # --- CONFIGURATION ---
 DEBUG_MODE = False
@@ -95,7 +110,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logging.info(f"Using device: {DEVICE}")
 if DEBUG_MODE: logging.info("\n!!! DEBUG MODE IS ACTIVE !!!\n")
 
-def get_target_columns(manifest_path, data_dir, num_targets):
+def get_target_columns(manifest_path: Path, data_dir: Path, num_targets: int) -> tuple[list[str], list[str]]:
+    """Select the most variable telemetry channels as prediction targets."""
+
     logging.info("Identifying target columns from training data...")
     with open(manifest_path, 'r') as f: manifest = json.load(f)
     train_files = [data_dir / item['track'] for item in manifest['train']]
@@ -111,7 +128,9 @@ def get_target_columns(manifest_path, data_dir, num_targets):
     logging.info(f"Selected {len(target_columns)} target columns: {target_columns}")
     return input_columns, target_columns
 
-def evaluate_model(model, loader, loss_fn, device):
+def evaluate_model(model: PredictionModel, loader, loss_fn, device: str) -> float:
+    """Evaluate reconstruction loss on a validation loader."""
+
     model.eval()
     total_loss = 0
     with torch.no_grad():

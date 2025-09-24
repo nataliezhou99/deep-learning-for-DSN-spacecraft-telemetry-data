@@ -1,22 +1,25 @@
-# extract_features.py
+"""Feature extraction for the MRO transformer prediction model."""
 
-import torch
-import numpy as np
-from pathlib import Path
-from torch import nn
-from tqdm import tqdm
 import json
 import logging
-import sys
-import pandas as pd
 import math
+import sys
+from pathlib import Path
 
-from data_utils_hybrid_vae import SingleTrackPredictionDataset
+import numpy as np
+import pandas as pd
+import torch
+from torch import nn
+from tqdm import tqdm
 
-# --- MODEL DEFINITION (Must match the trained model) ---
+from data_utils_hybrid_vae_mro import SingleTrackPredictionDataset
+
+
 class PositionalEncoding(nn.Module):
+    """Standard sinusoidal positional encoding."""
+
     def __init__(self, d_model, dropout=0.1, max_len=5000):
-        super(PositionalEncoding, self).__init__()
+        super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
@@ -30,9 +33,12 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1), :]
         return self.dropout(x)
 
+
 class TransformerEncoder(nn.Module):
+    """Transformer encoder mirroring the training configuration."""
+
     def __init__(self, input_dim, d_model, n_heads, num_encoder_layers, dim_feedforward, dropout):
-        super(TransformerEncoder, self).__init__()
+        super().__init__()
         self.d_model = d_model
         self.embedding = nn.Linear(input_dim, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
@@ -45,26 +51,35 @@ class TransformerEncoder(nn.Module):
         output = self.transformer_encoder(src)
         return output[:, -1, :]
 
+
 class Decoder(nn.Module):
+    """MLP decoder used to compute reconstruction error during extraction."""
+
     def __init__(self, d_model, output_dim):
-        super(Decoder, self).__init__()
+        super().__init__()
         self.mlp = nn.Sequential(
             nn.Linear(d_model, d_model * 2),
             nn.ReLU(),
-            nn.Linear(d_model * 2, output_dim)
+            nn.Linear(d_model * 2, output_dim),
         )
+
     def forward(self, z):
         return self.mlp(z)
 
+
 class PredictionModel(nn.Module):
+    """Transformer prediction model used for latent feature extraction."""
+
     def __init__(self, input_dim, output_dim, d_model, n_heads, num_encoder_layers, dim_feedforward, dropout):
-        super(PredictionModel, self).__init__()
+        super().__init__()
         self.encoder = TransformerEncoder(input_dim, d_model, n_heads, num_encoder_layers, dim_feedforward, dropout)
         self.decoder = Decoder(d_model, output_dim)
+
     def forward(self, x):
         encoded_state = self.encoder(x)
         predicted_target = self.decoder(encoded_state)
         return predicted_target
+
 
 # --- CONFIGURATION ---
 PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/MRODataSet")
@@ -81,7 +96,9 @@ NUM_TARGET_FEATURES = 10
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', stream=sys.stdout)
 
-def get_target_columns(manifest_path, data_dir, num_targets):
+def get_target_columns(manifest_path: Path, data_dir: Path, num_targets: int) -> tuple[list[str], list[str]]:
+    """Recreate the training-time target selection for consistency."""
+
     with open(manifest_path, 'r') as f: manifest = json.load(f)
     train_files = [data_dir / item['track'] for item in manifest['train']]
     df_list = [pd.read_parquet(f) for f in train_files[:50]]
@@ -95,7 +112,9 @@ def get_target_columns(manifest_path, data_dir, num_targets):
     input_columns = [col for col in all_columns if col not in target_columns]
     return input_columns, target_columns
 
-def generate_features_for_track(model, track_dataset, device):
+def generate_features_for_track(model: PredictionModel, track_dataset: SingleTrackPredictionDataset, device: str):
+    """Encode a track and concatenate latent features with prediction error."""
+
     model.eval()
     track_loader = torch.utils.data.DataLoader(track_dataset, batch_size=BATCH_SIZE, shuffle=False)
     all_features, all_labels = [], []
