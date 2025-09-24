@@ -1,4 +1,3 @@
-cat > README.md << 'EOF'
 # Deep Learning for DSN Spacecraft Telemetry Data
 
 > End-to-end pipeline for anomaly detection on NASA Deep Space Network (DSN) telemetry (JWST & MRO).  
@@ -175,5 +174,3 @@ Raw DSN telemetry are not included; scripts and structure show how to reproduce 
 Author
 Natalie Zhou — Caltech CS, DSN/JPL research, computational biology, and applied ML.
 Feel free to reach out on GitHub for details.
-
-EOF
