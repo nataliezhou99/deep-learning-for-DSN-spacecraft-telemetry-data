@@ -12,7 +12,7 @@ from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm 
 
 # --- 1. CONFIGURATION --- 
-PROJECT_DIR = Path("/home/nzhou/updated_dsn_project/JWSTData") 
+PROJECT_DIR = Path("/home/nzhou/JWSTDataset") 
 CHUNK_FILE_PATTERN = "chunk_*_mon_JWST.pkl.gz" 
 DRS_FILE = "all_dr_data.csv" 
 OUTPUT_DIR = PROJECT_DIR / "processed_diffusion_style" 
