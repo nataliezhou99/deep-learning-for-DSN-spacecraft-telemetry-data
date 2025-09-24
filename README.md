@@ -10,7 +10,7 @@ avoid hazards like lava and water, collect gems, and reach the door to advance l
 
 ---
 
-## 🎮 Gameplay
+## Gameplay
 - Side-scrolling 2D platformer
 - Physics engine with gravity, jumping, and collisions
 - Hazards: lava pits, water, moving blocks
@@ -20,7 +20,7 @@ avoid hazards like lava and water, collect gems, and reach the door to advance l
 
 ---
 
-## ✨ Features
+## Features
 - **Custom Engine**  
   - Physics system (bodies, forces, collision detection via Separating Axis Theorem)  
   - Scene graph for managing entities and assets  
@@ -37,7 +37,7 @@ avoid hazards like lava and water, collect gems, and reach the door to advance l
 
 ---
 
-## 🛠️ Code Structure
+## Code Structure
 ```
 
 include/     # Header files (engine, physics, scene, assets)
@@ -50,7 +50,7 @@ Makefile     # Build rules (local + web builds)
 
 ---
 
-## 🚀 Build & Run
+## Build & Run
 
 ### Prerequisites
 - **SDL2** development libraries
@@ -74,7 +74,7 @@ Then open `http://localhost:8000/demo/game.html` in your browser.
 
 ---
 
-## 🔧 Extending the Game
+## Extending the Game
 
 This project is designed to be **modular**:
 
@@ -84,7 +84,7 @@ This project is designed to be **modular**:
 
 ---
 
-## 📌 Skills Demonstrated
+## Skills Demonstrated
 
 * Low-level memory management in C
 * Game physics (forces, collisions, SAT algorithm)
@@ -95,10 +95,11 @@ This project is designed to be **modular**:
 
 ---
 
-## 👩‍💻 Author
+## Authors
 
 Developed by **Natalie Zhou, Olivia Wang, and Dillan Lau**
 
+Natalie Zhou
 * Computer Science @ Caltech
 * Interests: game development, systems programming, applied machine learning
 * Contact: [LinkedIn](https://www.linkedin.com/in/nataliezhou99) | [GitHub](https://github.com/nataliezhou99)
