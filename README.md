@@ -174,5 +174,6 @@ Raw DSN telemetry are **not** included; scripts and structure show how to reprod
 ## Author
 
 **Natalie Zhou** — CS + Mathematics @ Caltech, Research @ NASA JPL, Caltech, and USC.
+
 Contact Natalie Zhou: [LinkedIn](https://www.linkedin.com/in/nataliezhou99) | [GitHub](https://github.com/nataliezhou99)
 
