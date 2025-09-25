@@ -1,6 +1,6 @@
 # Deep Learning for DSN Spacecraft Telemetry Data
 
-> End-to-end pipeline for anomaly detection on NASA Deep Space Network (DSN) telemetry (JWST & MRO).  
+> End-to-end pipeline for anomaly detection on NASA Deep Space Network (DSN) telemetry data from the James Webb Space Telescope (JWST) and Mars Reconnaisance Orbiter (MRO).
 > Combines feature learning with deep models (CNN/BiLSTM/Attention) and classical ML (Random Forest), plus robust preprocessing and evaluation.
 
 ---
