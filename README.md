@@ -75,10 +75,10 @@ Each script defines a mission-specific `PROJECT_DIR` (currently pointing to `/ho
 Update those constants to wherever you store the DSN telemetry on your machine. The code expects the
 following structure under each project directory:
 
-- **JWST** (`PROJECT_DIR` default: `/home/nzhou/updated_dsn_project/JWSTData`)
+- **JWST** (`PROJECT_DIR` default: `/home/nzhou/JWST`)
   - Raw chunked telemetry pickles and DRS CSVs alongside the pipeline script expects files like `chunk_*_mon_JWST.pkl.gz`
   - Outputs written to `processed_diffusion_style/`
-- **MRO** (`PROJECT_DIR` default: `/home/nzhou/updated_dsn_project/MRODataSet`)
+- **MRO** (`PROJECT_DIR` default: `/home/nzhou/MRO`)
   - Raw telemetry/incident pickles (`mons.pkl`, `drs.pkl`) in the project root
   - Outputs written to `data_files/` and `processed_data/`
 
@@ -106,7 +106,7 @@ The pipeline scripts will:
 #### 4) Train Random Forest on extracted features (Optuna + SMOTE + evaluation)
 `python JWST/train_random_forest_jwst.py`
 
-### B) MROe
+### B) MRO
 #### 1) Build dataset & manifest
 `python MRO/data_pipeline_mro.py`
 
