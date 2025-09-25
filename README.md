@@ -104,20 +104,20 @@ The pipeline scripts will:
 #### 3) Extract features (latent encodings)
 `python JWST/hybrid_autoencoder_extract_features_jwst.py`
 
-#### 4) Train Random Forest on extracted features (SMOTE + evaluation)
+#### 4) Train Random Forest on extracted features (Optuna + SMOTE + evaluation)
 `python JWST/train_random_forest_jwst.py`
 
-### B) MRO
+### B) MROe
 #### 1) Build dataset & manifest
 `python MRO/data_pipeline_mro.py`
 
-#### 2) Train deep model (Transformer encoder + MLP decoder)
+#### 2) Train deep model (CNN + BiLSTM + Attention)
 `python MRO/train_hybrid_autoencoder_mro.py`
 
-#### 3) Extract features (latent + prediction error)
+#### 3) Extract features (latent encodings)
 `python MRO/hybrid_autoencoder_extract_features_mro.py`
 
-#### 4) Train Random Forest on extracted features (Optuna + SMOTE)
+#### 4) Train Random Forest on extracted features (Optuna + SMOTE + evaluation)
 `python MRO/train_random_forest_mro.py`
 
 ## Key Artifacts & Outputs
