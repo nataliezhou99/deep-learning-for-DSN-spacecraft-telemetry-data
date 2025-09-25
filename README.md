@@ -25,19 +25,18 @@
 ```
 deep-learning-for-DSN-spacecraft-telemetry-data/
 ├─ JWST/
-│  ├─ data_pipeline_jwst.py              # Build manifest, scale/encode, save per-track parquet + labels
-│  ├─ data_utils_jwst.py                 # PyTorch dataset + dataloaders for sliding windows
-│  ├─ train_hybrid_autoencoder_jwst.py   # CNN + BiLSTM + Attention encoder/decoder training
-│  ├─ autoencoder_extract_features_jwst.py # Latents from trained DL model per track
-│  ├─ extract_features_jwst.py           # Latents + reconstruction error → features for classical ML
-│  └─ train_random_forest_jwst.py        # Random Forest training & evaluation with point-adjusted metrics
+│  ├─ data_pipeline_jwst.py                        # Build manifest, scale/encode, save per-track parquet + labels
+│  ├─ data_utils_jwst.py                           # PyTorch dataset + dataloaders for sliding windows
+│  ├─ train_hybrid_autoencoder_jwst.py             # CNN + BiLSTM + Attention encoder/decoder training
+│  ├─ hybrid_autoencoder_extract_features_jwst.py  # Latents + reconstruction error → features for classical ML
+│  └─ train_random_forest_jwst.py                  # Random Forest training & evaluation with Optuna/SMOTE & diagnostics
 │
 └─ MRO/
-   ├─ data_pipeline_mro.py              # Build manifest, scale/encode, save per-track parquet + labels
-   ├─ data_utils_hybrid_vae_mro.py      # PyTorch dataset + dataloaders for sliding windows
-   ├─ train_hybrid_vae_mro.py           # Transformer encoder + MLP decoder (prediction task)
-   ├─ extract_features_mro.py           # Latents + prediction error → features for classical ML
-   └─ vae_train_random_forest_mro.py    # Random Forest training with Optuna/SMOTE & diagnostics
+   ├─ data_pipeline_mro.py                         # Build manifest, scale/encode, save per-track parquet + labels
+   ├─ data_utils_mro.py                            # PyTorch dataset + dataloaders for sliding windows
+   ├─ train_hybrid_autoencoder_mro.py              # CNN + BiLSTM + Attention encoder/decoder training
+   ├─ hybrid_autoencoder_extract_features_mro.py   # Latents + reconstruction error → features for classical ML
+   └─ train_random_forest_mro.py                   # Random Forest training & evaluation with Optuna/SMOTE & diagnostics
 ```
 
 
@@ -46,7 +45,7 @@ deep-learning-for-DSN-spacecraft-telemetry-data/
 ## What’s Interesting (Highlights)
 
 - **Time-aware features:** `seconds_since_start`, cyclical time (`hour_sin/cos`, `dayofweek_sin/cos`), per-track alignment to a **global start**
-- **Data quality:** high-cardinality categorical drop, correlated-feature pruning, missingness thresholding, **StandardScaler** on numerics
+- **Data quality:** high-cardinality categorical drop, correlated-feature pruning, missingness thresholding, normalization with scaler
 - **Windowed labels:** window label = `any(anomaly)` → precise **point-adjusted scoring** during eval
 - **Two-stage modeling:**
   - Stage 1: DL model learns **compressed representations** while predicting hardest (high-variance) targets
@@ -135,8 +134,7 @@ The pipeline scripts will:
 
 ## Modeling Details
 
-- **JWST:** Hybrid CNN → BiLSTM → **Attention** encoder with a decoder head to predict selected targets
-- **MRO:** **Transformer** encoder (positional encoding) + MLP decoder
+- Hybrid CNN → BiLSTM → **Attention** encoder with a decoder head to predict selected targets
 - **Targets:** Top-variance numeric telemetry signals (auto-selected from training split)  
 - **Features to RF:** Latent state (encoder output) **+** per-window reconstruction/prediction **error** (Huber-style)  
 - **Optimization:** Optuna search for RF (`n_estimators`, `max_depth`, etc.)
