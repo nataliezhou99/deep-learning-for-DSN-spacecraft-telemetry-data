@@ -17,8 +17,8 @@ Key behaviors
     • Saves features/labels per track as separate .npy artifacts.
 
 I/O conventions
-    Input  : PROJECT_DIR/processed_style/<dataset>/manifest.json
-             PROJECT_DIR/processed_style/<dataset>/data_files/*.parquet
+    Input  : PROJECT_DIR/processed_data/<dataset>/manifest.json
+             PROJECT_DIR/processed_data/<dataset>/data_files/*.parquet
              PROJECT_DIR/<dataset>/best_prediction_model_<dataset>.pth
     Output : PROJECT_DIR/<dataset>/random_forest_features_per_track/<track>_features.npy
              PROJECT_DIR/<dataset>/random_forest_features_per_track/<track>_labels.npy
@@ -142,7 +142,7 @@ class PredictionModel(nn.Module):
 # =========================
 DATASET_TO_USE = "low_band"
 PROJECT_DIR = Path("/home/nzhou/JWST")
-BASE_INPUT_DIR = PROJECT_DIR / "processed_style"
+BASE_INPUT_DIR = PROJECT_DIR / "processed_data"
 BASE_OUTPUT_DIR = PROJECT_DIR
 INPUT_DATASET_DIR = BASE_INPUT_DIR / DATASET_TO_USE
 OUTPUT_SUBDIR = BASE_OUTPUT_DIR / DATASET_TO_USE
