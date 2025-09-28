@@ -20,7 +20,7 @@ High‑level flow
 
 Inputs
     PROJECT_DIR/
-      ├─ xgboost_data/
+      ├─ random_forest_boost_data/
       │   ├─ train/  (<track>_{features|labels}.npy)  # normal tracks (TRAIN‑only)
       │   └─ test/   (<track>_{features|labels}.npy)  # mixed normal/anomalous (TEST)
 
@@ -60,9 +60,9 @@ import seaborn as sns
 # --- CONFIGURATION ---
 # =========================
 PROJECT_DIR = Path("/home/nzhou/MRO")
-XGB_DATA_DIR = PROJECT_DIR / "xgboost_data"
-XGB_TRAIN_DIR_NORMAL = XGB_DATA_DIR / "train"
-XGB_TEST_DIR_MIXED = XGB_DATA_DIR / "test"
+RANDOM_FOREST_DATA_DIR = PROJECT_DIR / "random_forest_data"
+RANDOM_FOREST_TRAIN_DIR_NORMAL = RANDOM_FOREST_DATA_DIR / "train"
+RANDOM_FOREST_TEST_DIR_MIXED = RANDOM_FOREST_DATA_DIR / "test"
 MODEL_SAVE_PATH = PROJECT_DIR / "best_random_forest_model.pkl"
 EVAL_LOG_FILE = PROJECT_DIR / "random_forest_evaluation.log"
 PLOTS_DIR = PROJECT_DIR / "plots"
@@ -261,13 +261,13 @@ if __name__ == "__main__":
     # --- Assemble training/testing windows according to split strategy ---
     if SPLIT_STRATEGY == 'within_track_chronological_split':
         logging.info("Loading and splitting each track chronologically...")
-        track_ids = sorted([f.stem.replace('_features', '') for f in XGB_TEST_DIR_MIXED.glob('*_features.npy')])
+        track_ids = sorted([f.stem.replace('_features', '') for f in RANDOM_FOREST_TEST_DIR_MIXED.glob('*_features.npy')])
         X_train_pieces, y_train_pieces, X_test_pieces, y_test_pieces = [], [], [], []
 
         # Normal tracks from TRAIN dir (all used for training)
         X_train_normal, y_train_normal = load_data_from_ids(
-            sorted([f.stem.replace('_features', '') for f in XGB_TRAIN_DIR_NORMAL.glob('*_features.npy')]),
-            XGB_TRAIN_DIR_NORMAL
+            sorted([f.stem.replace('_features', '') for f in RANDOM_FOREST_TRAIN_DIR_NORMAL.glob('*_features.npy')]),
+            RANDOM_FOREST_TRAIN_DIR_NORMAL
         )
         X_train_pieces.append(X_train_normal)
         y_train_pieces.append(y_train_normal)
@@ -275,8 +275,8 @@ if __name__ == "__main__":
         # For each mixed track, first 70% → train, last 30% → test
         for track_id in track_ids:
             try:
-                X_track = np.load(XGB_TEST_DIR_MIXED / f"{track_id}_features.npy")
-                y_track = np.load(XGB_TEST_DIR_MIXED / f"{track_id}_labels.npy")
+                X_track = np.load(RANDOM_FOREST_TEST_DIR_MIXED / f"{track_id}_features.npy")
+                y_track = np.load(RANDOM_FOREST_TEST_DIR_MIXED / f"{track_id}_labels.npy")
                 if len(X_track) < 10:
                     continue
                 split_point = int(0.7 * len(X_track))
@@ -291,16 +291,16 @@ if __name__ == "__main__":
 
     elif SPLIT_STRATEGY == 'stratified_track_split':
         logging.info("Splitting tracks using stratification...")
-        train_normal_track_ids = sorted([f.stem.replace('_features', '') for f in XGB_TRAIN_DIR_NORMAL.glob('*_features.npy')])
-        test_mixed_track_ids = sorted([f.stem.replace('_features', '') for f in XGB_TEST_DIR_MIXED.glob('*_features.npy')])
-        mixed_track_labels = [1 if check_track_has_anomaly(tid, XGB_TEST_DIR_MIXED) else 0 for tid in test_mixed_track_ids]
-        xgb_train_ids_from_test, xgb_test_ids = train_test_split(
+        train_normal_track_ids = sorted([f.stem.replace('_features', '') for f in RANDOM_FOREST_TRAIN_DIR_NORMAL.glob('*_features.npy')])
+        test_mixed_track_ids = sorted([f.stem.replace('_features', '') for f in RANDOM_FOREST_TEST_DIR_MIXED.glob('*_features.npy')])
+        mixed_track_labels = [1 if check_track_has_anomaly(tid, RANDOM_FOREST_TEST_DIR_MIXED) else 0 for tid in test_mixed_track_ids]
+        random_forest_train_ids_from_test, random_forest_test_ids = train_test_split(
             test_mixed_track_ids, test_size=0.4, random_state=42, stratify=mixed_track_labels
         )
         logging.info("Loading data for training and testing based on track IDs...")
-        X_train_normal, y_train_normal = load_data_from_ids(train_normal_track_ids, XGB_TRAIN_DIR_NORMAL)
-        X_train_mixed, y_train_mixed = load_data_from_ids(xgb_train_ids_from_test, XGB_TEST_DIR_MIXED)
-        X_test, y_test = load_data_from_ids(xgb_test_ids, XGB_TEST_DIR_MIXED)
+        X_train_normal, y_train_normal = load_data_from_ids(train_normal_track_ids, RANDOM_FOREST_TRAIN_DIR_NORMAL)
+        X_train_mixed, y_train_mixed = load_data_from_ids(random_forest_train_ids_from_test, RANDOM_FOREST_TEST_DIR_MIXED)
+        X_test, y_test = load_data_from_ids(random_forest_test_ids, RANDOM_FOREST_TEST_DIR_MIXED)
         X_train = np.concatenate((X_train_normal, X_train_mixed))
         y_train = np.concatenate((y_train_normal, y_train_mixed))
     else:
