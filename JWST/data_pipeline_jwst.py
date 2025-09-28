@@ -56,7 +56,7 @@ from tqdm import tqdm
 PROJECT_DIR = Path("/home/nzhou/JWST") 
 CHUNK_FILE_PATTERN = "chunk_*_mon_JWST.pkl.gz"  # Glob for per‑chunk pickled DF lists
 DRS_FILE = "all_dr_data.csv"  # CSV of anomaly incidents with start/end timestamps
-OUTPUT_DIR = PROJECT_DIR / "processed_diffusion_style"  # Root output dir for all datasets
+OUTPUT_DIR = PROJECT_DIR / "processed_style"  # Root output dir for all datasets
 LOG_FILE = PROJECT_DIR / "pipeline_jwst_adapted_debug.log"  # Unified log output
 SUCCESS_FLAG_FILE = PROJECT_DIR / "PIPELINE_JWST_ADAPTED_SUCCESS.FLAG"  # Sentinel file
 
@@ -382,7 +382,7 @@ def process_dataset(tracks_list, dataset_name, config):
         5) Learn transforms on a sample of TRAIN tracks only
         6) Materialize features/labels + manifest + scaler
     """
-    logging.info(f"--- Processing {dataset_name} Dataset (Diffusion-Style Output) ---") 
+    logging.info(f"--- Processing {dataset_name} Dataset ---") 
 
     # Directory scaffolding
     dataset_output_dir = OUTPUT_DIR / dataset_name 
