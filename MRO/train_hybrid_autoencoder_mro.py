@@ -1,3 +1,33 @@
+"""
+Training Prediction Model for MRO Telemetry
+--------------------------------------------------------
+Purpose
+    Train a predictor that maps sliding windows of telemetry to the target
+    feature vector at the last timestep of each window (Huber regression).
+    Dataloaders are built from the preprocessing manifest and
+    windowing utilities in `data_utils_mro.py`.
+
+Workflow
+    1) Auto‑select target columns from the TRAIN distribution via variance
+       ranking (time‑derived columns excluded). Inputs are the remaining cols.
+    2) Build TRAIN and VAL DataLoaders (windowed, with labels unused here).
+    3) Train a Transformer encoder + MLP decoder with HuberLoss.
+    4) Step LR via ReduceLROnPlateau on validation loss.
+    5) Early stop with patience; checkpoint the best model + hyperparams.
+
+I/O Conventions
+    Input  : PROJECT_DIR/processed_data/manifest.json
+             PROJECT_DIR/data_files/track_*.parquet + *_labels.npy
+    Output : PROJECT_DIR/best_prediction_model.pth
+             PROJECT_DIR/training_console_transformer.log
+             PROJECT_DIR/training_log_transformer.csv (epoch metrics)
+
+Notes
+    • This file adds documentation and inline comments only; no logic changes.
+    • The dataset returns ((window[T×F_in], target_last_step[F_out]), label);
+      labels are not used for training here (pure regression objective).
+"""
+
 import torch
 import numpy as np
 import pandas as pd
@@ -12,8 +42,15 @@ import math
 
 from data_utils_mro import create_prediction_dataloaders
 
+# =================
 # --- MODEL ---
+# =================
 class PositionalEncoding(nn.Module):
+    """Sinusoidal positional encoding with dropout.
+
+    Registered as a buffer so it isn't updated by the optimizer.
+    Expects input in shape [B, T, d_model].
+    """
     def __init__(self, d_model, dropout=0.1, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -29,7 +66,9 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1), :]
         return self.dropout(x)
 
+
 class TransformerEncoder(nn.Module):
+    """Transformer encoder returning the last token representation."""
     def __init__(self, input_dim, d_model, n_heads, num_encoder_layers, dim_feedforward, dropout):
         super(TransformerEncoder, self).__init__()
         self.d_model = d_model
@@ -39,12 +78,15 @@ class TransformerEncoder(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_encoder_layers)
 
     def forward(self, src):
+        # src: [B, T, F_in] → embed → add PE → encode → take last token
         src = self.embedding(src) * math.sqrt(self.d_model)
         src = self.pos_encoder(src)
         output = self.transformer_encoder(src)
         return output[:, -1, :]
 
+
 class Decoder(nn.Module):
+    """MLP head mapping encoder state → regression targets."""
     def __init__(self, d_model, output_dim):
         super(Decoder, self).__init__()
         self.mlp = nn.Sequential(
@@ -55,7 +97,9 @@ class Decoder(nn.Module):
     def forward(self, z):
         return self.mlp(z)
 
+
 class PredictionModel(nn.Module):
+    """Transformer encoder + MLP decoder (last‑step target prediction)."""
     def __init__(self, input_dim, output_dim, d_model, n_heads, num_encoder_layers, dim_feedforward, dropout):
         super(PredictionModel, self).__init__()
         self.encoder = TransformerEncoder(input_dim, d_model, n_heads, num_encoder_layers, dim_feedforward, dropout)
@@ -65,7 +109,10 @@ class PredictionModel(nn.Module):
         predicted_target = self.decoder(encoded_state)
         return predicted_target
 
+
+# =========================
 # --- CONFIGURATION ---
+# =========================
 DEBUG_MODE = False
 PROJECT_DIR = Path("/home/nzhou/MRO")
 OUTPUT_DIR = PROJECT_DIR / "processed_data"
@@ -89,27 +136,42 @@ NUM_ENCODER_LAYERS = 2
 DIM_FEEDFORWARD = 128
 DROPOUT_RATE = 0.2
 
+# Structured logging to file + stdout
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.FileHandler(TRAIN_LOG_FILE, mode='w'), logging.StreamHandler(sys.stdout)])
 logging.info(f"Using device: {DEVICE}")
-if DEBUG_MODE: logging.info("\n!!! DEBUG MODE IS ACTIVE !!!\n")
+if DEBUG_MODE:
+    logging.info("\n!!! DEBUG MODE IS ACTIVE !!!\n")
+
 
 def get_target_columns(manifest_path, data_dir, num_targets):
+    """Heuristically select high‑variance target columns from TRAIN files.
+
+    Time‑derived columns are excluded from target candidates; inputs are all
+    remaining columns. Returns (input_columns, target_columns).
+    """
     logging.info("Identifying target columns from training data...")
-    with open(manifest_path, 'r') as f: manifest = json.load(f)
+    with open(manifest_path, 'r') as f:
+        manifest = json.load(f)
     train_files = [data_dir / item['track'] for item in manifest['train']]
+
+    # Sample a reasonable subset to estimate variance robustly
     df_list = [pd.read_parquet(f) for f in train_files[:50]]
     full_df = pd.concat(df_list, ignore_index=True)
+
     numeric_cols = full_df.select_dtypes(include=np.number).columns.tolist()
     time_features_to_exclude = ['seconds_since_start', 'hour_sin', 'hour_cos', 'dayofweek_sin', 'dayofweek_cos']
     candidate_cols = [col for col in numeric_cols if col not in time_features_to_exclude]
     variances = full_df[candidate_cols].var().sort_values()
     target_columns = variances.tail(num_targets).index.tolist()
+
     all_columns = full_df.columns.tolist()
     input_columns = [col for col in all_columns if col not in target_columns]
     logging.info(f"Selected {len(target_columns)} target columns: {target_columns}")
     return input_columns, target_columns
 
+
 def evaluate_model(model, loader, loss_fn, device):
+    """Compute average loss over a validation DataLoader (no gradients)."""
     model.eval()
     total_loss = 0
     with torch.no_grad():
@@ -120,17 +182,26 @@ def evaluate_model(model, loader, loss_fn, device):
             total_loss += loss.item()
     return total_loss / len(loader)
 
+
+# ======================
+# --- Main Execution ---
+# ======================
 if __name__ == "__main__":
     logging.info("--- Training Transformer Prediction Model ---")
+
+    # (1) Feature column selection
     input_cols, target_cols = get_target_columns(MANIFEST_PATH, DATA_DIR, NUM_TARGET_FEATURES)
     
+    # (2) Build dataloaders
     dataloaders = create_prediction_dataloaders(
         manifest_path=MANIFEST_PATH, data_dir=DATA_DIR, input_cols=input_cols, target_cols=target_cols,
         batch_size=BATCH_SIZE, window_size=WINDOW_SIZE, debug_mode=DEBUG_MODE
     )
     train_loader, val_loader = dataloaders['train'], dataloaders['val']
-    if train_loader is None or val_loader is None: raise ValueError("Dataloaders could not be created.")
+    if train_loader is None or val_loader is None:
+        raise ValueError("Dataloaders could not be created.")
 
+    # (3) Instantiate model + optimizer + scheduler + loss
     input_dim, output_dim = len(input_cols), len(target_cols)
     logging.info(f"Model dimensions: input_dim={input_dim}, output_dim={output_dim}")
 
@@ -141,6 +212,8 @@ if __name__ == "__main__":
     loss_fn = nn.HuberLoss()
     
     best_val_loss, epochs_no_improve = float('inf'), 0
+
+    # (4) Train/validate loop with early stopping and CSV logging
     with open(LOG_SAVE_PATH, "w") as log_file:
         log_file.write("epoch,train_loss,val_loss,lr\n")
         
@@ -159,13 +232,16 @@ if __name__ == "__main__":
                 pbar.set_postfix(loss=loss.item())
             avg_train_loss = total_train_loss / len(pbar)
 
+            # Validation pass
             avg_val_loss = evaluate_model(model, val_loader, loss_fn, DEVICE)
             
+            # Scheduler step + metric logging
             scheduler.step(avg_val_loss)
             lr = optimizer.param_groups[0]['lr']
             logging.info(f"[Epoch {epoch+1}/{EPOCHS}] Train Loss: {avg_train_loss:.6f} | Val Loss: {avg_val_loss:.6f} | LR: {lr:.2e}")
             log_file.write(f"{epoch+1},{avg_train_loss},{avg_val_loss},{lr}\n")
             
+            # Early stopping + checkpoint best
             if avg_val_loss < best_val_loss:
                 best_val_loss, epochs_no_improve = avg_val_loss, 0
                 logging.info(f"Validation loss improved. Saving best model to {MODEL_SAVE_PATH}")
