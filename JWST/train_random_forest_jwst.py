@@ -18,7 +18,7 @@ Splitting strategies
         Preserves chronology but risks leakage if windows are highly correlated.
 
 Inputs
-    • PROJECT_DIR/processed_style/<dataset>/manifest.json
+    • PROJECT_DIR/processed_data/<dataset>/manifest.json
     • PROJECT_DIR/<dataset>/random_forest_features_per_track/<track>_{features,labels}.npy
 
 Outputs
@@ -53,7 +53,7 @@ DATASET_TO_USE = "low_band"
 SPLITTING_STRATEGY = "stratified_track_split" 
 
 PROJECT_DIR = Path("/home/nzhou/JWST")
-BASE_INPUT_DIR = PROJECT_DIR / "processed_style"
+BASE_INPUT_DIR = PROJECT_DIR / "processed_data"
 BASE_OUTPUT_DIR = PROJECT_DIR
 INPUT_DATASET_DIR = BASE_INPUT_DIR / DATASET_TO_USE
 OUTPUT_SUBDIR = BASE_OUTPUT_DIR / DATASET_TO_USE
