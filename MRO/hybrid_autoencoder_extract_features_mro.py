@@ -14,7 +14,7 @@ I/O conventions
     Input  : PROJECT_DIR/processed_data/manifest.json
              PROJECT_DIR/data_files/track_*.parquet and *_labels.npy
              PROJECT_DIR/best_prediction_model.pth (contains model_params + weights)
-    Output : PROJECT_DIR/xgboost_data/{train,test}/<track>_{features,labels}.npy
+    Output : PROJECT_DIR/random_forest_data/{train,test}/<track>_{features,labels}.npy
 
 Notes
     • No functional changes vs. the provided implementation; this file adds
@@ -121,9 +121,9 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 TRAINED_DL_MODEL_PATH = PROJECT_DIR / "best_prediction_model.pth"
 
 # Output subdirs for downstream (tree is created if missing)
-XGB_DATA_DIR = PROJECT_DIR / "xgboost_data"
-XGB_TRAIN_DIR = XGB_DATA_DIR / "train"
-XGB_TEST_DIR = XGB_DATA_DIR / "test"
+RANDOM_FOREST_DATA_DIR = PROJECT_DIR / "random_forest_data"
+RANDOM_FOREST_TRAIN_DIR = RANDOM_FOREST_DATA_DIR / "train"
+RANDOM_FOReST_TEST_DIR = RANDOM_FOREST_DATA_DIR / "test"
 
 # Runtime knobs
 BATCH_SIZE = 512
@@ -190,9 +190,9 @@ def generate_features_for_track(model, track_dataset, device):
 # ======================
 if __name__ == "__main__":
     # Prepare output directories for idempotent runs
-    XGB_DATA_DIR.mkdir(exist_ok=True)
-    XGB_TRAIN_DIR.mkdir(exist_ok=True)
-    XGB_TEST_DIR.mkdir(exist_ok=True)
+    RANDOM_FOREST_DATA_DIR.mkdir(exist_ok=True)
+    RANDOM_FOREST_TRAIN_DIR.mkdir(exist_ok=True)
+    RANDOM_FOREST_TEST_DIR.mkdir(exist_ok=True)
 
     # Ensure checkpoint exists before heavy work
     if not TRAINED_DL_MODEL_PATH.exists():
@@ -217,7 +217,7 @@ if __name__ == "__main__":
     # Iterate over TRAIN and TEST splits, save per‑track artifacts
     for split_name, tracks in [('train', manifest['train']), ('test', manifest['test'])]:
         logging.info(f"Generating features for the {split_name} set...")
-        output_dir = XGB_TRAIN_DIR if split_name == 'train' else XGB_TEST_DIR
+        output_dir = RANDOM_FOREST_TRAIN_DIR if split_name == 'train' else RANDOM_FOREST_TEST_DIR
         for track_info in tqdm(tracks, desc=f"Processing {split_name} tracks"):
             track_name = Path(track_info['track']).stem
             track_dataset = SingleTrackPredictionDataset(
