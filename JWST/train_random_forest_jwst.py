@@ -18,8 +18,8 @@ Splitting strategies
         Preserves chronology but risks leakage if windows are highly correlated.
 
 Inputs
-    • PROJECT_DIR/processed_diffusion_style/<dataset>/manifest.json
-    • PROJECT_DIR/<dataset>/xgboost_features_per_track/<track>_{features,labels}.npy
+    • PROJECT_DIR/processed_style/<dataset>/manifest.json
+    • PROJECT_DIR/<dataset>/random_forest_features_per_track/<track>_{features,labels}.npy
 
 Outputs
     • PROJECT_DIR/<dataset>/best_rf_model_<dataset>_<strategy>.pkl
@@ -53,11 +53,11 @@ DATASET_TO_USE = "low_band"
 SPLITTING_STRATEGY = "stratified_track_split" 
 
 PROJECT_DIR = Path("/home/nzhou/JWST")
-BASE_INPUT_DIR = PROJECT_DIR / "processed_diffusion_style"
+BASE_INPUT_DIR = PROJECT_DIR / "processed_style"
 BASE_OUTPUT_DIR = PROJECT_DIR
 INPUT_DATASET_DIR = BASE_INPUT_DIR / DATASET_TO_USE
 OUTPUT_SUBDIR = BASE_OUTPUT_DIR / DATASET_TO_USE
-XGB_FEATURES_DIR = OUTPUT_SUBDIR / "xgboost_features_per_track"
+RANDOM_FOREST_FEATURES_DIR = OUTPUT_SUBDIR / "random_forest_features_per_track"
 MANIFEST_PATH = INPUT_DATASET_DIR / "manifest.json"
 
 # Output file paths are dynamic and named for Random Forest (rf)
@@ -134,8 +134,8 @@ def load_data_from_tracks(track_list, desc):
     all_labels = []
     for track_info in tqdm(track_list, desc=desc):
         track_id = Path(track_info['track_features']).stem
-        feature_file = XGB_FEATURES_DIR / f"{track_id}_features.npy"
-        label_file = XGB_FEATURES_DIR / f"{track_id}_labels.npy"
+        feature_file = RANDOM_FOREST_FEATURES_DIR / f"{track_id}_features.npy"
+        label_file = RANDOM_FOREST_FEATURES_DIR / f"{track_id}_labels.npy"
         
         if feature_file.exists() and label_file.exists():
             all_features.append(np.load(feature_file))
@@ -166,7 +166,7 @@ if __name__ == "__main__":
         normal_tracks = []
         for track_info in tqdm(test_tracks, desc="Scanning track labels"):
             track_id = Path(track_info['track_features']).stem
-            label_file = XGB_FEATURES_DIR / f"{track_id}_labels.npy"
+            label_file = RANDOM_FOREST_FEATURES_DIR / f"{track_id}_labels.npy"
             if label_file.exists():
                 labels = np.load(label_file)
                 if np.sum(labels) > 0:
@@ -183,8 +183,8 @@ if __name__ == "__main__":
         logging.info(f"Final training set: {len(train_anom_tracks)} anomalous tracks, {len(train_norm_tracks)} normal tracks.")
         logging.info(f"Final evaluation set: {len(eval_anom_tracks)} anomalous tracks, {len(eval_norm_tracks)} normal tracks.")
 
-        X_xgb_train, y_xgb_train = load_data_from_tracks(train_tracks, desc="Loading training track data")
-        X_xgb_eval, y_xgb_eval = load_data_from_tracks(eval_tracks, desc="Loading evaluation track data")
+        X_random_forest_train, y_random_forest_train = load_data_from_tracks(train_tracks, desc="Loading training track data")
+        X_random_forest_eval, y_random_forest_eval = load_data_from_tracks(eval_tracks, desc="Loading evaluation track data")
 
     elif SPLITTING_STRATEGY == "within_track_chronological_split":
         logging.info("Performing within-track chronological split (70% train, 30% eval for each track)...")
@@ -192,8 +192,8 @@ if __name__ == "__main__":
         X_eval_list, y_eval_list = [], []
         for track_info in tqdm(test_tracks, desc="Splitting tracks chronologically"):
             track_id = Path(track_info['track_features']).stem
-            feature_file = XGB_FEATURES_DIR / f"{track_id}_features.npy"
-            label_file = XGB_FEATURES_DIR / f"{track_id}_labels.npy"
+            feature_file = RANDOM_FOREST_FEATURES_DIR / f"{track_id}_features.npy"
+            label_file = RANDOM_FOREST_FEATURES_DIR / f"{track_id}_labels.npy"
             if feature_file.exists() and label_file.exists():
                 X_track, y_track = np.load(feature_file), np.load(label_file)
                 if len(X_track) == 0: continue
@@ -203,25 +203,25 @@ if __name__ == "__main__":
                 X_eval_list.append(X_track[split_idx:])
                 y_eval_list.append(y_track[split_idx:])
         
-        X_xgb_train = np.concatenate(X_train_list, axis=0)
-        y_xgb_train = np.concatenate(y_train_list, axis=0)
-        X_xgb_eval = np.concatenate(X_eval_list, axis=0)
-        y_xgb_eval = np.concatenate(y_eval_list, axis=0)
+        X_random_forest_train = np.concatenate(X_train_list, axis=0)
+        y_random_forest_train = np.concatenate(y_train_list, axis=0)
+        X_random_forest_eval = np.concatenate(X_eval_list, axis=0)
+        y_random_forest_eval = np.concatenate(y_eval_list, axis=0)
     
     else:
         raise ValueError(f"Unknown SPLITTING_STRATEGY: '{SPLITTING_STRATEGY}'. Please choose a valid option.")
 
     # Sanity checks
-    if X_xgb_train.size == 0 or X_xgb_eval.size == 0:
+    if X_random_forest_train.size == 0 or X_random_forest_eval.size == 0:
         raise ValueError("Data loading resulted in empty arrays. Check if feature files were generated.")
     
-    logging.info(f"Clean training data shape: {X_xgb_train.shape}")
-    logging.info(f"Clean hold-out evaluation data shape: {X_xgb_eval.shape}")
+    logging.info(f"Clean training data shape: {X_random_forest_train.shape}")
+    logging.info(f"Clean hold-out evaluation data shape: {X_random_forest_eval.shape}")
 
     # Handle class imbalance on training set only
     logging.info("Applying SMOTE to the training data to balance classes...")
     smote = SMOTE(random_state=42, n_jobs=-1)
-    X_train_resampled, y_train_resampled = smote.fit_resample(X_xgb_train, y_xgb_train)
+    X_train_resampled, y_train_resampled = smote.fit_resample(X_random_forest_train, y_random_forest_train)
     logging.info(f"Resampled (balanced) training data shape: {X_train_resampled.shape}")
     
     # Model hyperparameters (first reasonable pass; tune separately if needed)
@@ -245,11 +245,11 @@ if __name__ == "__main__":
     
     # Evaluation under point‑adjusted F1
     logging.info("Evaluating final model on the hold-out evaluation set...")
-    test_scores = final_model.predict_proba(X_xgb_eval)[:, 1]
+    test_scores = final_model.predict_proba(X_random_forest_eval)[:, 1]
     
-    best_f1, prec, rec, f1_thresh, f1_cm = find_best_f1_point_adjusted(y_xgb_eval, test_scores)
+    best_f1, prec, rec, f1_thresh, f1_cm = find_best_f1_point_adjusted(y_random_forest_eval, test_scores)
     try: 
-        auc = roc_auc_score(y_xgb_eval, test_scores)
+        auc = roc_auc_score(y_random_forest_eval, test_scores)
     except ValueError: 
         auc = -1.0
     
