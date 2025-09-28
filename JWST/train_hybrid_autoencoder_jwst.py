@@ -20,8 +20,8 @@ Workflow
     4) Track validation reconstruction loss for early stopping and checkpointing.
 
 I/O conventions
-    Input  : PROJECT_DIR/processed_style/<dataset>/manifest.json
-             PROJECT_DIR/processed_style/<dataset>/data_files/*.parquet
+    Input  : PROJECT_DIR/processed_data/<dataset>/manifest.json
+             PROJECT_DIR/processed_data/<dataset>/data_files/*.parquet
              PROJECT_DIR/<dataset>/pseudo_labels_per_track/*_pseudo_labels.npy (optional)
     Output : PROJECT_DIR/<dataset>/best_prediction_model_<dataset>.pth (state_dict + params)
              PROJECT_DIR/<dataset>/training_console_<dataset>.log
@@ -140,7 +140,7 @@ class PredictionModel(nn.Module):
 # =========================
 DATASET_TO_USE = "low_band"
 PROJECT_DIR = Path("/home/nzhou/JWST")
-BASE_INPUT_DIR = PROJECT_DIR / "processed_style"
+BASE_INPUT_DIR = PROJECT_DIR / "processed_data"
 BASE_OUTPUT_DIR = PROJECT_DIR
 INPUT_DATASET_DIR = BASE_INPUT_DIR / DATASET_TO_USE
 OUTPUT_SUBDIR = BASE_OUTPUT_DIR / DATASET_TO_USE
