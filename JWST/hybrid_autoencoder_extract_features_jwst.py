@@ -17,11 +17,11 @@ Key behaviors
     • Saves features/labels per track as separate .npy artifacts.
 
 I/O conventions
-    Input  : PROJECT_DIR/processed_diffusion_style/<dataset>/manifest.json
-             PROJECT_DIR/processed_diffusion_style/<dataset>/data_files/*.parquet
+    Input  : PROJECT_DIR/processed_style/<dataset>/manifest.json
+             PROJECT_DIR/processed_style/<dataset>/data_files/*.parquet
              PROJECT_DIR/<dataset>/best_prediction_model_<dataset>.pth
-    Output : PROJECT_DIR/<dataset>/xgboost_features_per_track/<track>_features.npy
-             PROJECT_DIR/<dataset>/xgboost_features_per_track/<track>_labels.npy
+    Output : PROJECT_DIR/<dataset>/random_forest_features_per_track/<track>_features.npy
+             PROJECT_DIR/<dataset>/random_forest_features_per_track/<track>_labels.npy
 
 Notes
     • This script does *not* train the model—only extracts embeddings/features.
@@ -142,7 +142,7 @@ class PredictionModel(nn.Module):
 # =========================
 DATASET_TO_USE = "low_band"
 PROJECT_DIR = Path("/home/nzhou/JWST")
-BASE_INPUT_DIR = PROJECT_DIR / "processed_diffusion_style"
+BASE_INPUT_DIR = PROJECT_DIR / "processed_style"
 BASE_OUTPUT_DIR = PROJECT_DIR
 INPUT_DATASET_DIR = BASE_INPUT_DIR / DATASET_TO_USE
 OUTPUT_SUBDIR = BASE_OUTPUT_DIR / DATASET_TO_USE
@@ -151,10 +151,10 @@ MANIFEST_PATH = INPUT_DATASET_DIR / "manifest.json"
 TRAINED_DL_MODEL_PATH = OUTPUT_SUBDIR / f"best_prediction_model_{DATASET_TO_USE}.pth"
 
 # --- Output Files ---
-XGB_FEATURES_DIR = OUTPUT_SUBDIR / "xgboost_features_per_track"
-TEST_FEAT_PATH = XGB_FEATURES_DIR / "test_features.npy"   # Reference only; script saves per‑track
-TEST_LABELS_PATH = XGB_FEATURES_DIR / "test_labels.npy"
-TEST_BOUNDARIES_PATH = XGB_FEATURES_DIR / "test_boundaries.npy"
+RANDOM_FOREST_FEATURES_DIR = OUTPUT_SUBDIR / "random_forest_features_per_track"
+TEST_FEAT_PATH = RANDOM_FOREST_FEATURES_DIR / "test_features.npy"   # Reference only; script saves per‑track
+TEST_LABELS_PATH = RANDOM_FOREST_FEATURES_DIR / "test_labels.npy"
+TEST_BOUNDARIES_PATH = RANDOM_FOREST_FEATURES_DIR / "test_boundaries.npy"
 
 # --- Hyperparameters ---
 BATCH_SIZE = 512
@@ -198,7 +198,7 @@ def get_target_columns(manifest_path, data_dir, num_targets):
 
 if __name__ == "__main__":
     # Ensure output directory exists; avoid failure due to missing parent
-    XGB_FEATURES_DIR.mkdir(exist_ok=True)
+    RANDOM_FOREST_FEATURES_DIR.mkdir(exist_ok=True)
     
     # Sanity check: trained model must be present
     if not TRAINED_DL_MODEL_PATH.exists():
@@ -226,7 +226,7 @@ if __name__ == "__main__":
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
-    logging.info(f"Generating and saving features for each track to {XGB_FEATURES_DIR}...")
+    logging.info(f"Generating and saving features for each track to {RANDOM_FOREST_FEATURES_DIR}...")
     with torch.no_grad():
         # Iterate per‑track dataset inside the concatenated TEST dataset
         for track_dataset in tqdm(test_loader.dataset.datasets, desc="Processing individual tracks"):
@@ -250,7 +250,7 @@ if __name__ == "__main__":
             track_labels = np.concatenate(labels_list)
 
             # Persist per‑track artifacts; downstream code can glob by *_features.npy
-            np.save(XGB_FEATURES_DIR / f"{track_id}_features.npy", track_features)
-            np.save(XGB_FEATURES_DIR / f"{track_id}_labels.npy", track_labels)
+            np.save(RANDOM_FOREST_FEATURES_DIR / f"{track_id}_features.npy", track_features)
+            np.save(RANDOM_FOREST_FEATURES_DIR / f"{track_id}_labels.npy", track_labels)
 
     logging.info("--- Per-track feature extraction complete! ---")
