@@ -56,7 +56,7 @@ from tqdm import tqdm
 PROJECT_DIR = Path("/home/nzhou/JWST") 
 CHUNK_FILE_PATTERN = "chunk_*_mon_JWST.pkl.gz"  # Glob for per‑chunk pickled DF lists
 DRS_FILE = "all_dr_data.csv"  # CSV of anomaly incidents with start/end timestamps
-OUTPUT_DIR = PROJECT_DIR / "processed_style"  # Root output dir for all datasets
+OUTPUT_DIR = PROJECT_DIR / "processed_data"  # Root output dir for all datasets
 LOG_FILE = PROJECT_DIR / "pipeline_jwst_adapted_debug.log"  # Unified log output
 SUCCESS_FLAG_FILE = PROJECT_DIR / "PIPELINE_JWST_ADAPTED_SUCCESS.FLAG"  # Sentinel file
 
